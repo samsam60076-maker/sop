@@ -1,0 +1,11 @@
+上傳 GitHub 時：
+
+請拖「整個黃色資料夾 men-shi-pos」。
+不要只拖「開店.bat」。
+
+拖進去後，清單裡要同時看到：
+package.json
+render.yaml
+app
+components
+開店.bat
