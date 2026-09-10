@@ -17,6 +17,12 @@ import {
   applyReturn,
   applyCashRefund,
   applySale,
+  addPreorder,
+  markPreorderArrived,
+  markPreorderNotified,
+  pickupPreorder,
+  cancelPreorder,
+  removePreorder,
   confirmStocktake,
   discardStocktake,
   emptyState,
@@ -46,7 +52,9 @@ import {
 } from "@/lib/engine";
 import {
   DEFAULT_SHOP_NAME,
+  categoryCustomizationScore,
   defaultSettings,
+  mergeCategoryLists,
   normalizeSettings,
   uniqueCategories,
 } from "@/lib/shop";
@@ -181,6 +189,20 @@ type StoreContextValue = {
   ) => ReturnType<typeof addExpense>;
   removeExpense: (expenseId: string) => ReturnType<typeof removeExpense>;
   removeExpenses: (expenseIds: string[]) => ReturnType<typeof removeExpenses>;
+  addPreorder: (
+    input: Parameters<typeof addPreorder>[1],
+  ) => ReturnType<typeof addPreorder>;
+  markPreorderArrived: (
+    preorderId: string,
+  ) => ReturnType<typeof markPreorderArrived>;
+  markPreorderNotified: (
+    preorderId: string,
+  ) => ReturnType<typeof markPreorderNotified>;
+  pickupPreorder: (
+    input: Parameters<typeof pickupPreorder>[1],
+  ) => ReturnType<typeof pickupPreorder>;
+  cancelPreorder: (preorderId: string) => ReturnType<typeof cancelPreorder>;
+  removePreorder: (preorderId: string) => ReturnType<typeof removePreorder>;
   clearCatalog: () => void;
   exportBackup: () => string;
   importBackup: (raw: string) => { ok: true } | { ok: false; error: string };
@@ -232,6 +254,7 @@ function sanitizeState(value: unknown): AppState | null {
       ),
       expenses: asList(parsed.expenses),
       saleReturns: asList(parsed.saleReturns),
+      preorders: asList(parsed.preorders),
       settings: normalizeSettings(parsed.settings),
     });
   } catch {
@@ -256,6 +279,8 @@ function hasShopWork(state: AppState) {
     state.sales.length > 0 ||
     state.expenses.length > 0 ||
     (state.stocktakes ?? []).length > 0 ||
+    (state.preorders ?? []).length > 0 ||
+    categoryCustomizationScore(state.settings.categories) > 0 ||
     (shopName !== "" && shopName !== DEFAULT_SHOP_NAME)
   );
 }
@@ -268,6 +293,8 @@ function workScore(state: AppState) {
     state.sales.length +
     state.expenses.length +
     (state.stocktakes ?? []).length +
+    (state.preorders ?? []).length +
+    categoryCustomizationScore(state.settings.categories) +
     (shopName !== "" && shopName !== DEFAULT_SHOP_NAME ? 3 : 0)
   );
 }
@@ -494,10 +521,10 @@ function unifySharedCatalog(workspace: Workspace): Workspace {
   for (const branch of BRANCHES) {
     addAll(workspace.stores[branch.id].products);
   }
-  const categories = uniqueCategories([
-    ...workspace.stores[richestId].settings.categories,
-    ...catalog.map((item) => item.category),
-  ]);
+  const categories = mergeCategoryLists(
+    BRANCHES.map((branch) => workspace.stores[branch.id].settings.categories ?? []),
+    catalog.map((item) => item.category),
+  );
   const bins = uniqueCategories(
     BRANCHES.flatMap((branch) => workspace.stores[branch.id].settings.bins ?? []),
   );
@@ -770,6 +797,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       removeExpenses: (expenseIds) => {
         const result = removeExpenses(read(), expenseIds);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      addPreorder: (input) => {
+        const result = addPreorder(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      markPreorderArrived: (preorderId) => {
+        const result = markPreorderArrived(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      markPreorderNotified: (preorderId) => {
+        const result = markPreorderNotified(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      pickupPreorder: (input) => {
+        const result = pickupPreorder(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      cancelPreorder: (preorderId) => {
+        const result = cancelPreorder(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      removePreorder: (preorderId) => {
+        const result = removePreorder(read(), preorderId);
         if (result.ok) commit(result.state);
         return result;
       },

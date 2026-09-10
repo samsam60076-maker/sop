@@ -18,6 +18,35 @@ export function uniqueCategories(names: Iterable<string>): string[] {
   return out;
 }
 
+/** Longest list first (keeps custom chips), then union the rest. */
+export function mergeCategoryLists(
+  lists: Iterable<Iterable<string>>,
+  extras: Iterable<string> = [],
+): string[] {
+  let richest: string[] = [];
+  const all: string[] = [];
+  for (const list of lists) {
+    const names = uniqueCategories(list);
+    all.push(...names);
+    if (names.length > richest.length) richest = names;
+  }
+  return uniqueCategories([...richest, ...all, ...extras]);
+}
+
+export function categoryCustomizationScore(list?: string[] | null): number {
+  const cats = uniqueCategories(list ?? []);
+  const defaults = new Set<string>(DEFAULT_CATEGORIES);
+  let extras = 0;
+  for (const name of cats) {
+    if (!defaults.has(name)) extras += 1;
+  }
+  let missing = 0;
+  for (const name of DEFAULT_CATEGORIES) {
+    if (!cats.includes(name)) missing += 1;
+  }
+  return extras * 2 + missing + Math.max(0, cats.length - DEFAULT_CATEGORIES.length);
+}
+
 export function normalizeCategories(list?: string[] | null): string[] {
   if (!Array.isArray(list)) return [...DEFAULT_CATEGORIES];
   const out = uniqueCategories(list);
