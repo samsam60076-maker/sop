@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { ProductTypeahead } from "@/components/product-typeahead";
 import { parseTypedEntry, resolveProduct } from "@/lib/lookup";
@@ -72,8 +72,29 @@ function fullCheckoutOrder(list: Product[], order: string[]) {
   return [...kept, ...rest];
 }
 
+function checkoutOrderKey(storeId: string) {
+  return `corner-pos-checkout-order-${storeId}`;
+}
+
+function readCheckoutOrder(storeId: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(checkoutOrderKey(storeId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string");
+  } catch {
+    return [];
+  }
+}
+
+function writeCheckoutOrder(storeId: string, ids: string[]) {
+  window.localStorage.setItem(checkoutOrderKey(storeId), JSON.stringify(ids));
+}
+
 export function CheckoutView() {
-  const { state, checkout, refundCash, removeSale, removeReturn, setCheckoutOrder } =
+  const { storeId, state, checkout, refundCash, removeSale, removeReturn } =
     useStore();
   const categories = listedCategories(
     normalizeSettings(state.settings),
@@ -94,7 +115,16 @@ export function CheckoutView() {
   const [refundNote, setRefundNote] = useState("");
   const [staffBuy, setStaffBuy] = useState(false);
   const [arrange, setArrange] = useState(false);
-  const checkoutOrder = state.checkoutOrder ?? [];
+  const [checkoutOrder, setCheckoutOrderState] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCheckoutOrderState(readCheckoutOrder(storeId));
+  }, [storeId]);
+
+  function setCheckoutOrder(ids: string[]) {
+    setCheckoutOrderState(ids);
+    writeCheckoutOrder(storeId, ids);
+  }
 
   const products = useMemo(() => {
     const q = query.trim().toLowerCase();
