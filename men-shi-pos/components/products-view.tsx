@@ -381,11 +381,11 @@ export function ProductsView() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="font-heading text-lg font-semibold">總商品列表</h1>
           <p className="mt-1 w-full text-xs leading-5 text-muted-foreground">
-            同一台電腦上面切西螺／斗南會一起有名稱。別間門市的電腦請到
+            別間門市的電腦請到
             <a href="/shop" className="underline">
               備份門市資料
             </a>
-            匯出總商品再傳過去匯入。
+            匯出總商品，用 LINE 傳過去再匯入。
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground">

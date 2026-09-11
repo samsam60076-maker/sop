@@ -52,6 +52,16 @@ export function ShopView() {
     toast.success(`左上角已改成「${displayShopName(next)}」`);
   }
 
+  function downloadJson(filename: string, raw: string) {
+    const blob = new Blob([raw], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mx-auto max-w-xl px-4 py-6 md:px-6">
       <h1 className="font-heading text-2xl font-semibold">總部 · {storeName}</h1>
@@ -75,113 +85,113 @@ export function ShopView() {
         儲存店名
       </Button>
 
-      <p className="mt-6 text-sm leading-6 text-muted-foreground">
-        總商品名稱、售價存在這台電腦的瀏覽器，不會自己跑到別間門市的電腦。
-        同一台電腦請先按「把總商品套到七間門市」，再在上面點斗南／虎尾。
-        別間門市的電腦或手機請用「匯出總商品」傳到那台，再按「匯入總商品」。不要按下面的「匯入備份」，那會把這一間的銷貨蓋過去。
-      </p>
+      <section className="mt-10 border-t pt-6">
+        <h2 className="font-heading text-lg font-semibold">正式作業：傳到別間門市</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          一間把總商品打好。這台按「匯出總商品」，用 LINE 把檔傳過去，那台按「匯入總商品」。
+          名稱、售價會出現。庫存不會過去，各店自己進貨。不會自動同步到別台電腦。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={() => {
+              const stamp = new Date().toISOString().slice(0, 10);
+              downloadJson(`總商品-${stamp}.json`, exportCatalog());
+              toast.success("已下載總商品，請用 LINE 傳給別間門市");
+            }}
+          >
+            匯出總商品
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "application/json,.json";
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+                const raw = await file.text();
+                const result = importCatalog(raw);
+                if (!result.ok) {
+                  toast.error(result.error);
+                  return;
+                }
+                toast.success("總商品已匯入");
+                window.location.reload();
+              };
+              input.click();
+            }}
+          >
+            匯入總商品
+          </Button>
+        </div>
+      </section>
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          onClick={() => {
-            spreadCatalogNow();
-            toast.success("七間門市已套上同一套名稱售價，庫存仍各店分開");
-            window.location.reload();
-          }}
-        >
-          把總商品套到七間門市
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            const blob = new Blob([exportCatalog()], {
-              type: "application/json",
-            });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            const stamp = new Date().toISOString().slice(0, 10);
-            link.href = url;
-            link.download = `總商品-${stamp}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-            toast.success("已下載總商品，傳給別間門市的電腦");
-          }}
-        >
-          匯出總商品
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "application/json,.json";
-            input.onchange = async () => {
-              const file = input.files?.[0];
-              if (!file) return;
-              const raw = await file.text();
-              const result = importCatalog(raw);
-              if (!result.ok) {
-                toast.error(result.error);
-                return;
-              }
-              toast.success("總商品已匯入，七間門市名稱售價相同");
+      <section className="mt-8 border-t pt-6">
+        <h2 className="font-heading text-lg font-semibold">這台電腦上面切七間</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          總部這台要切換西螺／斗南／虎尾時才按。別間自己的電腦不用按這顆，用上面「匯入總商品」即可。
+        </p>
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              spreadCatalogNow();
+              toast.success("這台電腦的七間門市已套上同一套名稱售價");
               window.location.reload();
-            };
-            input.click();
-          }}
-        >
-          匯入總商品
-        </Button>
-      </div>
+            }}
+          >
+            這台電腦：套到七間
+          </Button>
+        </div>
+      </section>
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            const blob = new Blob([exportBackup()], {
-              type: "application/json",
-            });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            const stamp = new Date().toISOString().slice(0, 10);
-            link.href = url;
-            link.download = `${storeName}-備份-${stamp}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-            toast.success(`已下載${storeName}備份`);
-          }}
-        >
-          匯出本店備份
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "application/json,.json";
-            input.onchange = async () => {
-              const file = input.files?.[0];
-              if (!file) return;
-              const raw = await file.text();
-              const result = importBackup(raw);
-              if (!result.ok) {
-                toast.error(result.error);
-                return;
-              }
-              toast.success("備份已還原");
-              window.location.reload();
-            };
-            input.click();
-          }}
-        >
-          匯入備份
-        </Button>
-      </div>
+      <section className="mt-8 border-t pt-6">
+        <h2 className="font-heading text-lg font-semibold">這一間自己的帳</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          銷貨、進貨、庫存只在這一間。換電腦或重裝瀏覽器才用這裡。不要把本店備份匯入別間門市。
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const stamp = new Date().toISOString().slice(0, 10);
+              downloadJson(`${storeName}-備份-${stamp}.json`, exportBackup());
+              toast.success(`已下載${storeName}備份`);
+            }}
+          >
+            匯出本店備份
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "application/json,.json";
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+                const raw = await file.text();
+                const result = importBackup(raw);
+                if (!result.ok) {
+                  toast.error(result.error);
+                  return;
+                }
+                toast.success("備份已還原");
+                window.location.reload();
+              };
+              input.click();
+            }}
+          >
+            匯入備份
+          </Button>
+        </div>
+      </section>
 
       <div className="mt-10 border-t pt-5">
         <button
