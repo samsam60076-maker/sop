@@ -186,6 +186,9 @@ type StoreContextValue = {
   clearCatalog: () => void;
   exportBackup: () => string;
   importBackup: (raw: string) => { ok: true } | { ok: false; error: string };
+  spreadCatalogNow: () => void;
+  exportCatalog: () => string;
+  importCatalog: (raw: string) => { ok: true } | { ok: false; error: string };
 };
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -451,6 +454,103 @@ function spreadCatalog(workspace: Workspace, source: AppState): Workspace {
     };
   }
   return { ...workspace, stores };
+}
+
+const CATALOG_KIND = "corner-pos-catalog-v6";
+
+function catalogFromState(state: AppState) {
+  return {
+    kind: CATALOG_KIND,
+    products: state.products.map((item) => ({
+      ...item,
+      stock: 0,
+      bin: "",
+    })),
+    categories: [...state.settings.categories],
+    bins: [...state.settings.bins],
+    sop: state.settings.sop.map((section) => ({ ...section })),
+  };
+}
+
+function applyCatalogFields(input: {
+  products: Product[];
+  categories: string[];
+  bins: string[];
+  sop: AppState["settings"]["sop"];
+}) {
+  const current = read();
+  const previous = new Map(current.products.map((item) => [item.id, item]));
+  commitCatalog(
+    {
+      ...current,
+      products: input.products.map((item) => {
+        const existing = previous.get(item.id);
+        return {
+          ...item,
+          stock: existing?.stock ?? 0,
+          bin: existing?.bin ?? "",
+        };
+      }),
+      settings: {
+        ...current.settings,
+        categories: uniqueCategories(input.categories),
+        bins: uniqueCategories(input.bins),
+        sop: input.sop.map((section) => ({ ...section })),
+      },
+    },
+    { force: true },
+  );
+}
+
+function parseCatalog(raw: string):
+  | { ok: true }
+  | { ok: false; error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "檔案打不開" };
+  }
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    (parsed as { kind?: string }).kind === CATALOG_KIND
+  ) {
+    const body = parsed as ReturnType<typeof catalogFromState>;
+    if (!Array.isArray(body.products)) {
+      return { ok: false, error: "這不是總商品檔" };
+    }
+    applyCatalogFields({
+      products: body.products,
+      categories: body.categories ?? [],
+      bins: body.bins ?? [],
+      sop: body.sop ?? [],
+    });
+    return { ok: true };
+  }
+  const workspace = sanitizeWorkspace(parsed);
+  if (workspace && workspaceHasWork(workspace)) {
+    const unified = unifySharedCatalog(workspace);
+    const source = unified.stores[unified.currentStoreId];
+    applyCatalogFields({
+      products: source.products,
+      categories: source.settings.categories,
+      bins: source.settings.bins,
+      sop: source.settings.sop,
+    });
+    return { ok: true };
+  }
+  const next = sanitizeState(parsed);
+  if (!next || next.products.length === 0) {
+    return { ok: false, error: "這不是總商品檔" };
+  }
+  applyCatalogFields({
+    products: next.products,
+    categories: next.settings.categories,
+    bins: next.settings.bins,
+    sop: next.settings.sop,
+  });
+  return { ok: true };
 }
 
 function renameBinsEverywhere(workspace: Workspace, from: string, to: string): Workspace {
@@ -807,6 +907,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         commitCatalog(next, { force: true });
         return { ok: true };
       },
+      spreadCatalogNow: () => {
+        commitWorkspace(unifySharedCatalog(readWorkspace()), { force: true });
+      },
+      exportCatalog: () => {
+        const unified = unifySharedCatalog(readWorkspace());
+        commitWorkspace(unified, { force: true });
+        return JSON.stringify(
+          catalogFromState(unified.stores[unified.currentStoreId]),
+          null,
+          2,
+        );
+      },
+      importCatalog: (raw) => parseCatalog(raw),
     }),
     [state],
   );
