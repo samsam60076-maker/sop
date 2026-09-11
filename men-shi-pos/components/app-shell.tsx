@@ -46,18 +46,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b bg-sidebar text-sidebar-foreground">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1">
-          <span className="shrink-0 text-xs text-sidebar-foreground/70">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2 py-0.5">
+          <span className="shrink-0 text-[11px] text-sidebar-foreground/70">
             總部
           </span>
-          <div className="flex min-w-0 flex-wrap gap-1">
+          <div className="flex min-w-0 flex-wrap gap-0.5">
             {branches.map((branch) => (
               <button
                 key={branch.id}
                 type="button"
                 onClick={() => switchStore(branch.id)}
                 className={cn(
-                  "inline-flex min-h-10 items-center rounded-md px-2.5 text-sm sm:h-7 sm:min-h-0 sm:px-2",
+                  "inline-flex h-6 items-center rounded px-1.5 text-xs",
                   storeId === branch.id
                     ? "bg-sidebar-primary text-sidebar-primary-foreground"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
@@ -68,11 +68,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 pb-1">
-          <Link href="/shop" className="shrink-0 text-sm font-semibold">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2 pb-0.5">
+          <Link href="/shop" className="shrink-0 text-xs font-semibold">
             {storeName}
           </Link>
-          <nav className="flex min-w-0 flex-1 flex-wrap gap-1">
+          <nav className="flex min-w-0 flex-1 flex-wrap gap-0.5">
             {NAV.map((item) => {
               const active =
                 item.href === "/"
@@ -83,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "inline-flex min-h-10 items-center rounded-md px-2.5 text-sm transition-colors sm:h-7 sm:min-h-0 sm:px-2",
+                    "inline-flex h-6 items-center rounded px-1.5 text-xs transition-colors",
                     active
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent",

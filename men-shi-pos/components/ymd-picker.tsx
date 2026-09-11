@@ -42,16 +42,16 @@ export function YmdPicker({
   const years = Array.from({ length: 6 }, (_, index) => thisYear - 4 + index);
   const maxDay = daysInMonth(current.year, current.month);
   const box = compact
-    ? "h-10 rounded-lg border border-input bg-card px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+    ? "h-7 rounded-md border border-input bg-card px-1.5 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
     : selectClass;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1">
       <label className="flex items-center gap-1">
         <select
           id={id}
           name={id ? `${id}-year` : "sale-year"}
-          className={cn(box, compact ? "w-[5.5rem]" : "w-[6.5rem]")}
+          className={cn(box, compact ? "w-[4.75rem]" : "w-[6.5rem]")}
           value={current.year}
           onChange={(event) =>
             onChange(join(Number(event.target.value), current.month, current.day))
@@ -64,12 +64,12 @@ export function YmdPicker({
             </option>
           ))}
         </select>
-        <span className="text-sm text-muted-foreground">年</span>
+        <span className={cn(compact ? "text-xs" : "text-sm", "text-muted-foreground")}>年</span>
       </label>
       <label className="flex items-center gap-1">
         <select
           name={id ? `${id}-month` : "sale-month"}
-          className={cn(box, compact ? "w-16" : "w-20")}
+          className={cn(box, compact ? "w-11" : "w-20")}
           value={current.month}
           onChange={(event) =>
             onChange(join(current.year, Number(event.target.value), current.day))
@@ -82,12 +82,12 @@ export function YmdPicker({
             </option>
           ))}
         </select>
-        <span className="text-sm text-muted-foreground">月</span>
+        <span className={cn(compact ? "text-xs" : "text-sm", "text-muted-foreground")}>月</span>
       </label>
       <label className="flex items-center gap-1">
         <select
           name={id ? `${id}-day` : "sale-day"}
-          className={cn(box, compact ? "w-16" : "w-20")}
+          className={cn(box, compact ? "w-11" : "w-20")}
           value={Math.min(current.day, maxDay)}
           onChange={(event) =>
             onChange(join(current.year, current.month, Number(event.target.value)))
@@ -100,7 +100,7 @@ export function YmdPicker({
             </option>
           ))}
         </select>
-        <span className="text-sm text-muted-foreground">日</span>
+        <span className={cn(compact ? "text-xs" : "text-sm", "text-muted-foreground")}>日</span>
       </label>
     </div>
   );

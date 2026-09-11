@@ -45,8 +45,36 @@ function composeLineNote(line: {
   return [line.priceReason, line.note?.trim()].filter(Boolean).join("、");
 }
 
+function checkoutRank(order: string[]) {
+  return new Map(order.map((id, index) => [id, index]));
+}
+
+function sortForCheckout(list: Product[], order: string[]) {
+  if (order.length === 0) {
+    return [...list].sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
+  }
+  const rank = checkoutRank(order);
+  return [...list].sort((a, b) => {
+    const left = rank.get(a.id) ?? 1_000_000;
+    const right = rank.get(b.id) ?? 1_000_000;
+    if (left !== right) return left - right;
+    return a.name.localeCompare(b.name, "zh-Hant");
+  });
+}
+
+function fullCheckoutOrder(list: Product[], order: string[]) {
+  const known = new Set(list.map((item) => item.id));
+  const kept = order.filter((id) => known.has(id));
+  const rest = sortForCheckout(
+    list.filter((item) => !kept.includes(item.id)),
+    [],
+  ).map((item) => item.id);
+  return [...kept, ...rest];
+}
+
 export function CheckoutView() {
-  const { state, checkout, refundCash, removeSale, removeReturn } = useStore();
+  const { state, checkout, refundCash, removeSale, removeReturn, setCheckoutOrder } =
+    useStore();
   const categories = listedCategories(
     normalizeSettings(state.settings),
     state.products,
@@ -65,21 +93,22 @@ export function CheckoutView() {
   const [refundAmount, setRefundAmount] = useState("");
   const [refundNote, setRefundNote] = useState("");
   const [staffBuy, setStaffBuy] = useState(false);
+  const [arrange, setArrange] = useState(false);
+  const checkoutOrder = state.checkoutOrder ?? [];
 
   const products = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return state.products
-      .filter((product) => {
-        if (!product.active) return false;
-        if (category !== "全部" && product.category !== category) return false;
-        if (!q) return true;
-        return (
-          product.name.toLowerCase().includes(q) ||
-          product.sku.toLowerCase().includes(q)
-        );
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-  }, [state.products, query, category]);
+    const filtered = state.products.filter((product) => {
+      if (!product.active) return false;
+      if (category !== "全部" && product.category !== category) return false;
+      if (!q) return true;
+      return (
+        product.name.toLowerCase().includes(q) ||
+        product.sku.toLowerCase().includes(q)
+      );
+    });
+    return sortForCheckout(filtered, checkoutOrder);
+  }, [state.products, query, category, checkoutOrder]);
 
   const lines = cart
     .map((line) => {
@@ -145,6 +174,33 @@ export function CheckoutView() {
   function toggleStaffBuy(next: boolean) {
     setStaffBuy(next);
     setCart((current) => retagCart(current, next));
+  }
+
+  function moveCheckout(productId: string, dir: "front" | "left" | "right") {
+    const visible = products.map((item) => item.id);
+    const here = visible.indexOf(productId);
+    if (here < 0) return;
+    const nextVisible = [...visible];
+    if (dir === "front") {
+      nextVisible.splice(here, 1);
+      nextVisible.unshift(productId);
+    } else if (dir === "left" && here > 0) {
+      [nextVisible[here - 1], nextVisible[here]] = [
+        nextVisible[here],
+        nextVisible[here - 1],
+      ];
+    } else if (dir === "right" && here < nextVisible.length - 1) {
+      [nextVisible[here], nextVisible[here + 1]] = [
+        nextVisible[here + 1],
+        nextVisible[here],
+      ];
+    } else {
+      return;
+    }
+    const merged = fullCheckoutOrder(state.products, checkoutOrder);
+    const used = new Set(nextVisible);
+    const remainder = merged.filter((id) => !used.has(id));
+    setCheckoutOrder([...nextVisible, ...remainder]);
   }
 
   function addProduct(product: Product, qty = 1) {
@@ -725,14 +781,14 @@ export function CheckoutView() {
     <div className="flex min-h-[calc(100svh-2.25rem)] flex-col lg:flex-row">
       <section className="min-w-0 flex-1">
         <div className="border-b bg-card px-3 py-2">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">銷貨年月日</span>
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">銷貨年月日</span>
             <YmdPicker compact value={saleDate} onChange={setSaleDate} />
             <div className="flex rounded-md border p-0.5">
               <button
                 type="button"
                 className={cn(
-                  "rounded px-2 py-1 text-xs",
+                  "rounded px-1.5 py-0.5 text-[11px]",
                   !staffBuy
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground",
@@ -744,7 +800,7 @@ export function CheckoutView() {
               <button
                 type="button"
                 className={cn(
-                  "rounded px-2 py-1 text-xs",
+                  "rounded px-1.5 py-0.5 text-[11px]",
                   staffBuy
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground",
@@ -754,15 +810,27 @@ export function CheckoutView() {
                 員工購買
               </button>
             </div>
+            <button
+              type="button"
+              className={cn(
+                "rounded-md border px-1.5 py-0.5 text-[11px]",
+                arrange
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "text-muted-foreground",
+              )}
+              onClick={() => setArrange((current) => !current)}
+            >
+              {arrange ? "完成位置" : "調整位置"}
+            </button>
           </div>
-          <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+          <div className="mb-1.5 flex flex-wrap gap-1">
             {["全部", ...categories].map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-sm whitespace-nowrap",
+                  "rounded-full border px-2 py-0.5 text-[11px]",
                   category === item
                     ? "border-primary bg-primary text-primary-foreground"
                     : "bg-background text-muted-foreground hover:bg-muted",
@@ -865,7 +933,7 @@ export function CheckoutView() {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-3 gap-1.5 p-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
           {state.products.length === 0 ? (
             <div className="col-span-full flex flex-col items-center gap-4 rounded-2xl border bg-card px-6 py-16 text-center">
               <p className="text-xl font-semibold">還沒有商品</p>
@@ -878,37 +946,68 @@ export function CheckoutView() {
               找不到符合的商品
             </div>
           ) : (
-            products.map((product) => {
+            products.map((product, index) => {
               const left = product.stock - cartQtyOf(cart, product.id);
               return (
-              <button
+              <div
                 key={product.id}
-                type="button"
-                onClick={() => addProduct(product)}
-                className="flex min-h-16 flex-col justify-between rounded-lg border bg-card px-3 py-2 text-left transition hover:border-primary/50 hover:bg-muted/40"
+                className="flex min-h-14 flex-col justify-between rounded-md border bg-card px-2 py-1.5 text-left"
               >
-                <p className="line-clamp-2 text-sm font-medium leading-snug">
-                  {product.name}
-                </p>
-                <p className="mt-1 font-heading text-lg font-semibold tabular-nums">
-                  {twd(staffBuy ? product.cost : product.price)}
-                </p>
-                <p
-                  className={cn(
-                    "text-[11px] tabular-nums",
-                    left <= 0
-                      ? "text-destructive"
-                      : "text-muted-foreground",
-                  )}
+                <button
+                  type="button"
+                  onClick={() => !arrange && addProduct(product)}
+                  className="min-w-0 text-left transition hover:text-primary"
                 >
-                  庫存 {left}
-                </p>
-                {staffBuy && product.price !== product.cost ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    售價 {twd(product.price)}
+                  <p className="line-clamp-2 text-[11px] font-medium leading-tight">
+                    {product.name}
                   </p>
+                  <p className="mt-0.5 font-heading text-sm font-semibold tabular-nums">
+                    {twd(staffBuy ? product.cost : product.price)}
+                  </p>
+                  <p
+                    className={cn(
+                      "text-[10px] tabular-nums",
+                      left <= 0
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    庫存 {left}
+                  </p>
+                  {staffBuy && product.price !== product.cost ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      售價 {twd(product.price)}
+                    </p>
+                  ) : null}
+                </button>
+                {arrange ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      className="rounded border px-1 text-[10px] text-muted-foreground"
+                      onClick={() => moveCheckout(product.id, "front")}
+                    >
+                      最前
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border px-1 text-[10px] text-muted-foreground disabled:opacity-40"
+                      disabled={index === 0}
+                      onClick={() => moveCheckout(product.id, "left")}
+                    >
+                      左
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border px-1 text-[10px] text-muted-foreground disabled:opacity-40"
+                      disabled={index === products.length - 1}
+                      onClick={() => moveCheckout(product.id, "right")}
+                    >
+                      右
+                    </button>
+                  </div>
                 ) : null}
-              </button>
+              </div>
               );
             })
           )}
