@@ -17,6 +17,7 @@ import { formatTime, inputDateToIso, toInputDate, twd } from "@/lib/format";
 import Link from "next/link";
 import { productFromTypedName, resolveProduct } from "@/lib/lookup";
 import { listedCategories, normalizeSettings } from "@/lib/shop";
+import { isCombo } from "@/lib/pricing";
 import { useStore } from "@/lib/store";
 import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,9 @@ export function PurchasesView() {
     normalizeSettings(state.settings),
     state.products,
   );
-  const activeProducts = state.products.filter((product) => product.active);
+  const activeProducts = state.products.filter(
+    (product) => product.active && !isCombo(product),
+  );
   const tileProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     return activeProducts.filter((product) => {

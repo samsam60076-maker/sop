@@ -34,6 +34,7 @@ import { ProductTypeahead } from "@/components/product-typeahead";
 import { YmdPicker } from "@/components/ymd-picker";
 import { formatDateTime, inputDateToIso, paymentLabel, toInputDate, twd } from "@/lib/format";
 import { profitOf, remainingReturnQty } from "@/lib/engine";
+import { lineAmount } from "@/lib/pricing";
 import { parseTypedEntry, resolveProduct } from "@/lib/lookup";
 import { useStore } from "@/lib/store";
 import type { CartLine, Product, Sale } from "@/lib/types";
@@ -479,7 +480,7 @@ export function SalesView() {
                           {twd(item.unitPrice)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {twd(item.qty * item.unitPrice)}
+                          {twd(lineAmount(item))}
                         </TableCell>
                         {selected.status === "completed" ? (
                           <TableCell className="text-right">
