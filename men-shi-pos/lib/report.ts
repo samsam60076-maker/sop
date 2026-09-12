@@ -1,3 +1,4 @@
+import { lineAmount } from "@/lib/pricing";
 import type { AppState, Product } from "@/lib/types";
 
 export type ReportPeriod = "day" | "month" | "all";
@@ -141,9 +142,9 @@ export function buildStockReport(
       };
       sold.set(item.productId, {
         qty: current.qty + item.qty,
-        amount: current.amount + item.qty * item.unitPrice,
+        amount: current.amount + lineAmount(item),
         cost: current.cost + item.qty * item.unitCost,
-        profit: current.profit + (item.unitPrice - item.unitCost) * item.qty,
+        profit: current.profit + (lineAmount(item) - item.unitCost * item.qty),
         name: item.name,
         sku: item.sku,
       });
@@ -256,7 +257,7 @@ export function buildSaleDetails(
         unitPrice: item.unitPrice,
         listPrice: product?.price ?? null,
         unitCost: item.unitCost,
-        amount: item.qty * item.unitPrice,
+        amount: lineAmount(item),
         costAmount: item.qty * item.unitCost,
       });
     }

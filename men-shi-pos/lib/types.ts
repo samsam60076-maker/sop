@@ -53,6 +53,16 @@ export const PAYMENT_METHODS = [
 ] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]["value"];
 
+export type ComboPart = {
+  productId: string;
+  qty: number;
+};
+
+export type PriceTier = {
+  qty: number;
+  total: number;
+};
+
 export type Product = {
   id: string;
   sku: string;
@@ -65,6 +75,8 @@ export type Product = {
   stock: number;
   minStock: number;
   active: boolean;
+  comboParts?: ComboPart[];
+  priceTiers?: PriceTier[];
 };
 
 export type PurchaseItem = {
@@ -93,6 +105,7 @@ export type SaleItem = {
   qty: number;
   unitPrice: number;
   unitCost: number;
+  lineTotal?: number;
   note?: string;
 };
 
@@ -190,6 +203,40 @@ export type ShopSettings = {
   sop: SopSection[];
 };
 
+export type PreorderSource = "facebook" | "line" | "phone" | "other";
+
+export type PreorderStatus =
+  | "ordered"
+  | "arrived"
+  | "notified"
+  | "picked"
+  | "cancelled";
+
+export type PreorderItem = {
+  productId: string;
+  name: string;
+  sku: string;
+  qty: number;
+  unitPrice: number;
+};
+
+export type Preorder = {
+  id: string;
+  number: string;
+  createdAt: string;
+  customerName: string;
+  contact: string;
+  source: PreorderSource;
+  items: PreorderItem[];
+  status: PreorderStatus;
+  arrivedAt?: string;
+  notifiedAt?: string;
+  pickedAt?: string;
+  saleId?: string;
+  saleNumber?: string;
+  note: string;
+};
+
 export type AppState = {
   products: Product[];
   purchases: Purchase[];
@@ -198,6 +245,8 @@ export type AppState = {
   stocktakes: Stocktake[];
   expenses: Expense[];
   saleReturns: SaleReturn[];
+  preorders: Preorder[];
+  checkoutOrder: string[];
   settings: ShopSettings;
 };
 

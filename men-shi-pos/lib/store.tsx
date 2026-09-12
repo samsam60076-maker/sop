@@ -17,9 +17,16 @@ import {
   applyReturn,
   applyCashRefund,
   applySale,
+  addPreorder,
+  markPreorderArrived,
+  markPreorderNotified,
+  pickupPreorder,
+  cancelPreorder,
+  removePreorder,
   confirmStocktake,
   discardStocktake,
   emptyState,
+  installDealDemo,
   saveStocktakeBins,
   saveStocktakeCounts,
   setStocktakeCountedAt,
@@ -46,8 +53,8 @@ import {
 } from "@/lib/engine";
 import {
   DEFAULT_SHOP_NAME,
-  defaultSettings,
   categoryCustomizationScore,
+  defaultSettings,
   mergeCategoryLists,
   normalizeSettings,
   uniqueCategories,
@@ -86,25 +93,10 @@ type StoreContextValue = {
   allStores: { id: BranchId; name: string; state: AppState }[];
   switchStore: (id: BranchId) => void;
   state: AppState;
-  addProduct: (input: {
-    sku: string;
-    name: string;
-    category: Category;
-    unit: Unit;
-    cost: number;
-    price: number;
-    minStock: number;
-  }) => { ok: true; product: Product } | { ok: false; error: string };
-  updateProduct: (input: {
-    id: string;
-    sku: string;
-    name: string;
-    category: Category;
-    unit: Unit;
-    cost: number;
-    price: number;
-    minStock: number;
-  }) => { ok: true; product: Product } | { ok: false; error: string };
+  addProduct: (input: Parameters<typeof upsertProduct>[1]) =>
+    { ok: true; product: Product } | { ok: false; error: string };
+  updateProduct: (input: Parameters<typeof upsertProduct>[1] & { id: string }) =>
+    { ok: true; product: Product } | { ok: false; error: string };
   setActive: (productId: string, active: boolean) => void;
   removeProduct: (
     productId: string,
@@ -169,6 +161,7 @@ type StoreContextValue = {
   ) => ReturnType<typeof discardStocktake>;
   refreshStocktakeCatalog: () => AppState;
   updateSettings: (settings: ShopSettings) => void;
+  setCheckoutOrder: (ids: string[]) => void;
   addCategory: (name: string) => ReturnType<typeof addCategory>;
   renameCategory: (
     from: string,
@@ -183,7 +176,22 @@ type StoreContextValue = {
   ) => ReturnType<typeof addExpense>;
   removeExpense: (expenseId: string) => ReturnType<typeof removeExpense>;
   removeExpenses: (expenseIds: string[]) => ReturnType<typeof removeExpenses>;
+  addPreorder: (
+    input: Parameters<typeof addPreorder>[1],
+  ) => ReturnType<typeof addPreorder>;
+  markPreorderArrived: (
+    preorderId: string,
+  ) => ReturnType<typeof markPreorderArrived>;
+  markPreorderNotified: (
+    preorderId: string,
+  ) => ReturnType<typeof markPreorderNotified>;
+  pickupPreorder: (
+    input: Parameters<typeof pickupPreorder>[1],
+  ) => ReturnType<typeof pickupPreorder>;
+  cancelPreorder: (preorderId: string) => ReturnType<typeof cancelPreorder>;
+  removePreorder: (preorderId: string) => ReturnType<typeof removePreorder>;
   clearCatalog: () => void;
+  installDealDemo: () => ReturnType<typeof installDealDemo>;
   exportBackup: () => string;
   importBackup: (raw: string) => { ok: true } | { ok: false; error: string };
   spreadCatalogNow: () => void;
@@ -237,6 +245,10 @@ function sanitizeState(value: unknown): AppState | null {
       ),
       expenses: asList(parsed.expenses),
       saleReturns: asList(parsed.saleReturns),
+      preorders: asList(parsed.preorders),
+      checkoutOrder: asList<string>(parsed.checkoutOrder).filter(
+        (item) => typeof item === "string",
+      ),
       settings: normalizeSettings(parsed.settings),
     });
   } catch {
@@ -261,6 +273,7 @@ function hasShopWork(state: AppState) {
     state.sales.length > 0 ||
     state.expenses.length > 0 ||
     (state.stocktakes ?? []).length > 0 ||
+    (state.preorders ?? []).length > 0 ||
     categoryCustomizationScore(state.settings.categories) > 0 ||
     (shopName !== "" && shopName !== DEFAULT_SHOP_NAME)
   );
@@ -274,6 +287,7 @@ function workScore(state: AppState) {
     state.sales.length +
     state.expenses.length +
     (state.stocktakes ?? []).length +
+    (state.preorders ?? []).length +
     categoryCustomizationScore(state.settings.categories) +
     (shopName !== "" && shopName !== DEFAULT_SHOP_NAME ? 3 : 0)
   );
@@ -824,6 +838,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           settings: normalizeSettings(settings),
         });
       },
+      setCheckoutOrder: (ids) => {
+        commit({
+          ...read(),
+          checkoutOrder: ids.filter((item) => typeof item === "string"),
+        });
+      },
       addCategory: (name) => {
         const result = addCategory(read(), name);
         if (result.ok) commitCatalog(result.state);
@@ -877,6 +897,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (result.ok) commit(result.state);
         return result;
       },
+      addPreorder: (input) => {
+        const result = addPreorder(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      markPreorderArrived: (preorderId) => {
+        const result = markPreorderArrived(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      markPreorderNotified: (preorderId) => {
+        const result = markPreorderNotified(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      pickupPreorder: (input) => {
+        const result = pickupPreorder(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      cancelPreorder: (preorderId) => {
+        const result = cancelPreorder(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      removePreorder: (preorderId) => {
+        const result = removePreorder(read(), preorderId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
       clearCatalog: () => {
         const current = read();
         commitCatalog(
@@ -886,6 +936,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           },
           { force: true },
         );
+      },
+      installDealDemo: () => {
+        const result = installDealDemo(read());
+        if (result.ok) commitCatalog(result.state, { force: true });
+        return result;
       },
       exportBackup: () => JSON.stringify(read(), null, 2),
       importBackup: (raw) => {

@@ -8,10 +8,24 @@ import type {
   SaleReturn,
   PaymentMethod,
   Category,
+  ComboPart,
+  PriceTier,
   Unit,
   Stocktake,
   StocktakeLine,
+  Preorder,
+  PreorderItem,
+  PreorderSource,
 } from "@/lib/types";
+import {
+  comboCost,
+  comboPartsOf,
+  dealTotal,
+  expandComboLines,
+  isCombo,
+  lineAmount,
+  priceTiersOf,
+} from "@/lib/pricing";
 import { defaultSettings, uniqueCategories } from "@/lib/shop";
 
 export const emptyState: AppState = {
@@ -22,6 +36,8 @@ export const emptyState: AppState = {
   stocktakes: [],
   expenses: [],
   saleReturns: [],
+  preorders: [],
+  checkoutOrder: [],
   settings: defaultSettings(),
 };
 
@@ -46,6 +62,46 @@ function qtyByProduct(items: { productId: string; qty: number }[]) {
     map.set(item.productId, (map.get(item.productId) ?? 0) + item.qty);
   }
   return map;
+}
+
+function cleanComboParts(
+  state: AppState,
+  input: ComboPart[] | undefined,
+  selfId?: string,
+): EngineResult<ComboPart[]> {
+  if (input == null) return { ok: true, data: [], state };
+  const parts: ComboPart[] = [];
+  for (const part of input) {
+    const qty = Math.round(part.qty);
+    if (!part.productId || qty <= 0) continue;
+    if (selfId && part.productId === selfId) {
+      return { ok: false, error: "套組不能包含自己" };
+    }
+    const item = state.products.find((row) => row.id === part.productId);
+    if (!item) return { ok: false, error: "套組裡有找不到的商品" };
+    if (isCombo(item)) return { ok: false, error: "套組不能再套別組" };
+    const existing = parts.find((row) => row.productId === part.productId);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      parts.push({ productId: part.productId, qty });
+    }
+  }
+  return { ok: true, data: parts, state };
+}
+
+function cleanPriceTiers(input: PriceTier[] | undefined): PriceTier[] {
+  if (!input) return [];
+  const tiers: PriceTier[] = [];
+  for (const tier of input) {
+    const qty = Math.round(tier.qty);
+    const total = Math.round(tier.total);
+    if (qty < 2 || total < 0 || !Number.isFinite(total)) continue;
+    const existing = tiers.find((row) => row.qty === qty);
+    if (existing) existing.total = total;
+    else tiers.push({ qty, total });
+  }
+  return tiers.sort((left, right) => left.qty - right.qty);
 }
 
 function addStock(products: Product[], add: Map<string, number>) {
@@ -111,6 +167,8 @@ export function upsertProduct(
     cost: number;
     price: number;
     minStock: number;
+    comboParts?: ComboPart[];
+    priceTiers?: PriceTier[];
   },
 ): EngineResult<Product> {
   const name = input.name.trim();
@@ -133,6 +191,28 @@ export function upsertProduct(
   }
   if (input.minStock < 0) return { ok: false, error: "安全庫存不可為負數" };
 
+  const existingForDeals = input.id
+    ? state.products.find((product) => product.id === input.id)
+    : undefined;
+  const cleanedParts =
+    input.comboParts === undefined
+      ? {
+          ok: true as const,
+          data: existingForDeals ? comboPartsOf(existingForDeals) : [],
+          state,
+        }
+      : cleanComboParts(state, input.comboParts, input.id);
+  if (!cleanedParts.ok) return cleanedParts;
+  const comboParts = cleanedParts.data;
+  const priceTiers =
+    comboParts.length > 0
+      ? []
+      : input.priceTiers === undefined
+        ? existingForDeals
+          ? priceTiersOf(existingForDeals)
+          : []
+        : cleanPriceTiers(input.priceTiers);
+
   const category = input.category.trim();
   if (!category) return { ok: false, error: "請選擇分類" };
   const settings = {
@@ -154,9 +234,14 @@ export function upsertProduct(
       name,
       category,
       unit: input.unit,
-      cost: Math.round(input.cost),
+      cost:
+        comboParts.length > 0
+          ? comboCost({ ...existing, comboParts }, state.products)
+          : Math.round(input.cost),
       price: Math.round(input.price),
-      minStock: Math.round(input.minStock),
+      minStock: comboParts.length > 0 ? 0 : Math.round(input.minStock),
+      comboParts,
+      priceTiers,
     };
     return {
       ok: true,
@@ -177,16 +262,127 @@ export function upsertProduct(
     name,
     category,
     unit: input.unit,
-    cost: Math.round(input.cost),
+    cost:
+      comboParts.length > 0
+        ? comboCost({ comboParts } as Product, state.products)
+        : Math.round(input.cost),
     price: Math.round(input.price),
-    minStock: Math.round(input.minStock),
+    minStock: comboParts.length > 0 ? 0 : Math.round(input.minStock),
     stock: 0,
     active: true,
+    comboParts,
+    priceTiers,
   };
   return {
     ok: true,
     data: product,
     state: { ...state, settings, products: [product, ...state.products] },
+  };
+}
+
+const DEMO_PARTS: {
+  name: string;
+  price: number;
+  cost: number;
+  unit: Unit;
+}[] = [
+  { name: "23白蝦", price: 179, cost: 120, unit: "包" },
+  { name: "鱸魚下巴", price: 80, cost: 45, unit: "包" },
+  { name: "蜜汁肋排", price: 180, cost: 120, unit: "包" },
+  { name: "燒肉片", price: 245, cost: 160, unit: "包" },
+];
+
+export const DEMO_COMBO_NAME = "烤肉組";
+export const DEMO_DEAL_NAME = "測試多件蛋";
+
+export function installDealDemo(
+  state: AppState,
+): EngineResult<{ combo: Product; deal: Product }> {
+  let current = state;
+  const category =
+    current.settings.categories.find(Boolean) ||
+    current.products[0]?.category ||
+    "冷凍";
+  const partIds: string[] = [];
+
+  for (const row of DEMO_PARTS) {
+    const existing = current.products.find((item) => item.name === row.name);
+    const result = upsertProduct(current, {
+      id: existing?.id,
+      sku: existing?.sku ?? "",
+      name: row.name,
+      category: existing?.category ?? category,
+      unit: existing?.unit ?? row.unit,
+      cost: row.cost,
+      price: row.price,
+      minStock: 0,
+      comboParts: [],
+      priceTiers: [],
+    });
+    if (!result.ok) return result;
+    current = {
+      ...result.state,
+      products: result.state.products.map((item) =>
+        item.id === result.data.id
+          ? { ...item, stock: Math.max(item.stock, 10), active: true }
+          : item,
+      ),
+    };
+    partIds.push(result.data.id);
+  }
+
+  const dealExisting = current.products.find(
+    (item) => item.name === DEMO_DEAL_NAME,
+  );
+  const dealResult = upsertProduct(current, {
+    id: dealExisting?.id,
+    sku: dealExisting?.sku ?? "",
+    name: DEMO_DEAL_NAME,
+    category: dealExisting?.category ?? category,
+    unit: dealExisting?.unit ?? "顆",
+    cost: 20,
+    price: 60,
+    minStock: 0,
+    comboParts: [],
+    priceTiers: [{ qty: 2, total: 100 }],
+  });
+  if (!dealResult.ok) return dealResult;
+  current = {
+    ...dealResult.state,
+    products: dealResult.state.products.map((item) =>
+      item.id === dealResult.data.id
+        ? { ...item, stock: Math.max(item.stock, 10), active: true }
+        : item,
+    ),
+  };
+
+  const comboExisting = current.products.find(
+    (item) => item.name === DEMO_COMBO_NAME,
+  );
+  const comboResult = upsertProduct(current, {
+    id: comboExisting?.id,
+    sku: comboExisting?.sku ?? "",
+    name: DEMO_COMBO_NAME,
+    category: comboExisting?.category ?? category,
+    unit: "組",
+    cost: 0,
+    price: 599,
+    minStock: 0,
+    comboParts: partIds.map((productId) => ({ productId, qty: 1 })),
+    priceTiers: [],
+  });
+  if (!comboResult.ok) return comboResult;
+  current = {
+    ...comboResult.state,
+    products: comboResult.state.products.map((item) =>
+      item.id === comboResult.data.id ? { ...item, active: true } : item,
+    ),
+  };
+
+  return {
+    ok: true,
+    data: { combo: comboResult.data, deal: dealResult.data },
+    state: current,
   };
 }
 
@@ -435,6 +631,10 @@ export function applyPurchase(
     if (!state.products.some((product) => product.id === item.productId)) {
       return { ok: false, error: "找不到進貨商品" };
     }
+    const product = state.products.find((row) => row.id === item.productId)!;
+    if (isCombo(product)) {
+      return { ok: false, error: `${product.name} 是套組，請進裡面的商品` };
+    }
   }
 
   const createdAt = input.createdAt ?? nowIso();
@@ -530,6 +730,7 @@ export function applySale(
       productId: string;
       qty: number;
       unitPrice?: number;
+      lineTotal?: number;
       note?: string;
     }[];
     paymentMethod: PaymentMethod;
@@ -544,9 +745,15 @@ export function applySale(
     product: Product;
     qty: number;
     unitPrice: number;
+    lineTotal?: number;
     note: string;
   }[] = [];
   const qtyByProduct = new Map<string, number>();
+
+  function addDeduct(productId: string, qty: number) {
+    qtyByProduct.set(productId, (qtyByProduct.get(productId) ?? 0) + qty);
+  }
+
   for (const item of input.items) {
     const product = state.products.find((row) => row.id === item.productId);
     if (!product) return { ok: false, error: "找不到銷售商品" };
@@ -562,16 +769,62 @@ export function applySale(
     if (!product.active) {
       return { ok: false, error: `${product.name} 已停售` };
     }
+    const note = item.note?.trim() || "";
+    if (isCombo(product)) {
+      for (const part of comboPartsOf(product)) {
+        const child = state.products.find((row) => row.id === part.productId);
+        if (!child) {
+          return { ok: false, error: `${product.name} 缺少套組商品` };
+        }
+        if (!child.active) {
+          return { ok: false, error: `${child.name} 已停售` };
+        }
+      }
+      try {
+        const expanded = expandComboLines(
+          product,
+          qty,
+          unitPrice,
+          state.products,
+        );
+        for (const line of expanded) {
+          lineItems.push({
+            product: line.product,
+            qty: line.qty,
+            unitPrice: line.unitPrice,
+            lineTotal: line.lineTotal,
+            note: [product.name, note].filter(Boolean).join("、"),
+          });
+          addDeduct(line.product.id, line.qty);
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "套組無法結帳",
+        };
+      }
+      continue;
+    }
+
+    const custom =
+      item.lineTotal != null ||
+      (item.unitPrice != null && item.unitPrice !== product.price);
+    const lineTotal = custom
+      ? Math.round(item.lineTotal ?? unitPrice * qty)
+      : dealTotal(product, qty);
     lineItems.push({
       product,
       qty,
       unitPrice,
-      note: item.note?.trim() || "",
+      lineTotal,
+      note,
     });
-    qtyByProduct.set(product.id, (qtyByProduct.get(product.id) ?? 0) + qty);
+    addDeduct(product.id, qty);
   }
+
   for (const [productId, qty] of qtyByProduct) {
     const product = state.products.find((row) => row.id === productId)!;
+    if (isCombo(product)) continue;
     if (product.stock < qty) {
       return {
         ok: false,
@@ -580,16 +833,19 @@ export function applySale(
     }
   }
 
-  const items = lineItems.map(({ product, qty, unitPrice, note }) => ({
-    productId: product.id,
-    name: product.name,
-    sku: product.sku,
-    qty,
-    unitPrice,
-    unitCost: product.cost,
-    note,
-  }));
-  const total = items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
+  const items = lineItems.map(
+    ({ product, qty, unitPrice, lineTotal, note }) => ({
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      qty,
+      unitPrice,
+      unitCost: product.cost,
+      lineTotal,
+      note,
+    }),
+  );
+  const total = items.reduce((sum, row) => sum + lineAmount(row), 0);
   const received =
     input.paymentMethod === "cash" ? Math.round(input.received) : total;
   if (input.paymentMethod === "cash" && received < total) {
@@ -617,7 +873,8 @@ export function applySale(
 
   const products = state.products.map((product) => {
     const sold = qtyByProduct.get(product.id);
-    return sold ? { ...product, stock: product.stock - sold } : product;
+    if (!sold || isCombo(product)) return product;
+    return { ...product, stock: product.stock - sold };
   });
 
   const movements: Movement[] = items.map((item) => ({
@@ -1060,14 +1317,18 @@ export function inventoryValue(state: AppState) {
 
 export function lowStockProducts(state: AppState) {
   return state.products.filter(
-    (product) => product.active && product.stock <= product.minStock,
+    (product) =>
+      product.active &&
+      !isCombo(product) &&
+      product.stock <= product.minStock,
   );
 }
 
 export function profitOf(sale: Sale) {
   if (sale.status === "voided") return 0;
   return sale.items.reduce(
-    (sum, item) => sum + (item.unitPrice - item.unitCost) * item.qty,
+    (sum, item) =>
+      sum + (lineAmount(item) - item.unitCost * item.qty),
     0,
   );
 }
@@ -1110,7 +1371,9 @@ export function linesForStocktake(
 ): StocktakeLine[] {
   const previous = new Map(existing.map((line) => [line.productId, line]));
   const catalogIds = new Set(products.map((product) => product.id));
-  const lines = sortStocktakeProducts(products).map((product) => {
+  const lines = sortStocktakeProducts(
+    products.filter((product) => !isCombo(product)),
+  ).map((product) => {
     const current = previous.get(product.id);
     if (current) {
       return {
@@ -1469,4 +1732,324 @@ export function removeExpense(
 
 export function removeExpenses(state: AppState, expenseIds: string[]) {
   return applyEach(state, expenseIds, "請先勾選要刪的支出", removeExpense);
+}
+
+function preorderList(state: AppState): Preorder[] {
+  return state.preorders ?? [];
+}
+
+function findPreorder(state: AppState, id: string) {
+  return preorderList(state).find((item) => item.id === id);
+}
+
+function replacePreorder(state: AppState, next: Preorder): AppState {
+  return {
+    ...state,
+    preorders: preorderList(state).map((item) =>
+      item.id === next.id ? next : item,
+    ),
+  };
+}
+
+export function preorderTotal(items: { qty: number; unitPrice: number }[]) {
+  return items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
+}
+
+export function addPreorder(
+  state: AppState,
+  input: {
+    customerName: string;
+    contact?: string;
+    source?: PreorderSource;
+    note?: string;
+    items: {
+      productId: string;
+      qty: number;
+      unitPrice?: number;
+    }[];
+  },
+): EngineResult<Preorder> {
+  const customerName = input.customerName.trim();
+  if (!customerName) return { ok: false, error: "請填客人名字（臉書名稱即可）" };
+  if (input.items.length === 0) return { ok: false, error: "請先加入訂購商品" };
+
+  const items: PreorderItem[] = [];
+  for (const line of input.items) {
+    const product = state.products.find((row) => row.id === line.productId);
+    if (!product) return { ok: false, error: "找不到訂購商品" };
+    const qty = Math.round(line.qty);
+    const unitPrice =
+      line.unitPrice == null ? product.price : Math.round(line.unitPrice);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { ok: false, error: "數量必須大於 0" };
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return { ok: false, error: `${product.name} 的售價不可為負數` };
+    }
+    items.push({
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      qty,
+      unitPrice,
+    });
+  }
+
+  const createdAt = nowIso();
+  const preorder: Preorder = {
+    id: crypto.randomUUID(),
+    number: nextSeq(
+      "FB-",
+      preorderList(state).map((item) => item.number),
+    ),
+    createdAt,
+    customerName,
+    contact: input.contact?.trim() ?? "",
+    source: input.source ?? "facebook",
+    items,
+    status: "ordered",
+    note: input.note?.trim() ?? "",
+  };
+  return {
+    ok: true,
+    data: preorder,
+    state: {
+      ...state,
+      preorders: [preorder, ...preorderList(state)],
+    },
+  };
+}
+
+export function markPreorderArrived(
+  state: AppState,
+  preorderId: string,
+): EngineResult<Preorder> {
+  const existing = findPreorder(state, preorderId);
+  if (!existing) return { ok: false, error: "找不到這筆訂購" };
+  if (existing.status === "picked") {
+    return { ok: false, error: "這筆已經取貨結帳" };
+  }
+  if (existing.status === "cancelled") {
+    return { ok: false, error: "這筆已取消" };
+  }
+  const next: Preorder = {
+    ...existing,
+    status: existing.status === "notified" ? "notified" : "arrived",
+    arrivedAt: existing.arrivedAt ?? nowIso(),
+  };
+  return { ok: true, data: next, state: replacePreorder(state, next) };
+}
+
+export function markPreorderNotified(
+  state: AppState,
+  preorderId: string,
+): EngineResult<Preorder> {
+  const existing = findPreorder(state, preorderId);
+  if (!existing) return { ok: false, error: "找不到這筆訂購" };
+  if (existing.status === "picked") {
+    return { ok: false, error: "這筆已經取貨結帳" };
+  }
+  if (existing.status === "cancelled") {
+    return { ok: false, error: "這筆已取消" };
+  }
+  const next: Preorder = {
+    ...existing,
+    status: "notified",
+    arrivedAt: existing.arrivedAt ?? nowIso(),
+    notifiedAt: nowIso(),
+  };
+  return { ok: true, data: next, state: replacePreorder(state, next) };
+}
+
+export function cancelPreorder(
+  state: AppState,
+  preorderId: string,
+): EngineResult<Preorder> {
+  const existing = findPreorder(state, preorderId);
+  if (!existing) return { ok: false, error: "找不到這筆訂購" };
+  if (existing.status === "picked") {
+    return { ok: false, error: "已結帳不能取消，請到銷貨退貨" };
+  }
+  if (existing.status === "cancelled") {
+    return { ok: false, error: "這筆已取消" };
+  }
+  const next: Preorder = { ...existing, status: "cancelled" };
+  return { ok: true, data: next, state: replacePreorder(state, next) };
+}
+
+export function pickupPreorder(
+  state: AppState,
+  input: {
+    preorderId?: string;
+    preorderIds?: string[];
+    received: number;
+    createdAt?: string;
+    lines?: { productId: string; qty: number }[];
+    extraItems?: {
+      productId: string;
+      qty: number;
+      unitPrice?: number;
+    }[];
+  },
+): EngineResult<{ preorder: Preorder; sale: Sale }> {
+  const ids = [
+    ...new Set(
+      [...(input.preorderIds ?? []), input.preorderId ?? ""].filter(Boolean),
+    ),
+  ];
+  const orders = ids
+    .map((id) => findPreorder(state, id))
+    .filter((item): item is Preorder => Boolean(item))
+    .filter((item) => item.status !== "picked" && item.status !== "cancelled")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (ids.length > 0 && orders.length === 0) {
+    return { ok: false, error: "找不到可取貨的訂購" };
+  }
+
+  const want = new Map<string, number>();
+  if (input.lines) {
+    for (const line of input.lines) {
+      const qty = Math.round(line.qty);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      want.set(line.productId, (want.get(line.productId) ?? 0) + qty);
+    }
+  } else {
+    for (const order of orders) {
+      for (const item of order.items) {
+        want.set(item.productId, (want.get(item.productId) ?? 0) + item.qty);
+      }
+    }
+  }
+
+  const saleItems: {
+    productId: string;
+    qty: number;
+    unitPrice: number;
+    note: string;
+  }[] = [];
+  const leftoverById = new Map<string, PreorderItem[]>();
+  const shippedIds = new Set<string>();
+
+  for (const order of orders) {
+    const leftover: PreorderItem[] = [];
+    for (const item of order.items) {
+      const take = Math.min(item.qty, want.get(item.productId) ?? 0);
+      if (take > 0) {
+        saleItems.push({
+          productId: item.productId,
+          qty: take,
+          unitPrice: item.unitPrice,
+          note: "臉書訂購取貨",
+        });
+        want.set(item.productId, (want.get(item.productId) ?? 0) - take);
+        shippedIds.add(order.id);
+      }
+      if (item.qty - take > 0) {
+        leftover.push({ ...item, qty: item.qty - take });
+      }
+    }
+    leftoverById.set(order.id, leftover);
+  }
+
+  for (const [productId, leftoverWant] of want) {
+    if (leftoverWant > 0) {
+      const name =
+        orders
+          .flatMap((order) => order.items)
+          .find((item) => item.productId === productId)?.name ?? "商品";
+      return { ok: false, error: `${name} 要出的數量超過訂購` };
+    }
+  }
+
+  for (const extra of input.extraItems ?? []) {
+    const product = state.products.find((row) => row.id === extra.productId);
+    if (!product) return { ok: false, error: "找不到要加買的商品" };
+    const qty = Math.round(extra.qty);
+    const unitPrice =
+      extra.unitPrice == null ? product.price : Math.round(extra.unitPrice);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { ok: false, error: "加買數量必須大於 0" };
+    }
+    saleItems.push({
+      productId: product.id,
+      qty,
+      unitPrice,
+      note: "現場加買",
+    });
+  }
+
+  if (saleItems.length === 0) {
+    return { ok: false, error: "請勾要取的商品，或加入現場要買的" };
+  }
+
+  const who = orders[0]?.customerName ?? "";
+  const numbers = orders.map((order) => order.number).join("、");
+  const anyLeftover = [...leftoverById.values()].some((items) => items.length > 0);
+  const sold = applySale(state, {
+    items: saleItems,
+    paymentMethod: "cash",
+    received: input.received,
+    note: who
+      ? `臉書訂購 ${numbers} ${who}${anyLeftover ? " 先出有貨" : ""}${
+          (input.extraItems ?? []).length > 0 ? " 含現場加買" : ""
+        }`
+      : "現場加買",
+    createdAt: input.createdAt,
+  });
+  if (!sold.ok) return sold;
+
+  let working = sold.state;
+  let last = orders[0];
+  for (const order of orders) {
+    if (!shippedIds.has(order.id)) {
+      last = order;
+      continue;
+    }
+    const leftover = leftoverById.get(order.id) ?? order.items;
+    const next: Preorder = {
+      ...order,
+      items: leftover,
+      status: leftover.length > 0 ? order.status : "picked",
+      arrivedAt: order.arrivedAt ?? nowIso(),
+      notifiedAt: order.notifiedAt,
+      pickedAt: leftover.length > 0 ? order.pickedAt : sold.data.createdAt,
+      saleId: sold.data.id,
+      saleNumber:
+        leftover.length > 0 ? order.saleNumber ?? sold.data.number : sold.data.number,
+      note:
+        leftover.length > 0
+          ? [order.note, `已先出 ${sold.data.number}`].filter(Boolean).join("；")
+          : order.note,
+    };
+    working = replacePreorder(working, next);
+    last = next;
+  }
+  const fallback = last ?? orders[0];
+  if (!fallback) {
+    return { ok: false, error: "找不到可取貨的訂購" };
+  }
+  return {
+    ok: true,
+    data: { preorder: fallback, sale: sold.data },
+    state: working,
+  };
+}
+
+export function removePreorder(
+  state: AppState,
+  preorderId: string,
+): EngineResult<Preorder> {
+  const existing = findPreorder(state, preorderId);
+  if (!existing) return { ok: false, error: "找不到這筆訂購" };
+  if (existing.status === "picked") {
+    return { ok: false, error: "已結帳不能刪，請到銷貨處理" };
+  }
+  return {
+    ok: true,
+    data: existing,
+    state: {
+      ...state,
+      preorders: preorderList(state).filter((item) => item.id !== preorderId),
+    },
+  };
 }
