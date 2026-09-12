@@ -525,8 +525,8 @@ export function CheckoutView() {
 
   const cartPanel = (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col lg:max-w-none">
-      <div className="flex items-center justify-between px-4 py-3">
-        <p className="text-base font-semibold">
+      <div className="flex items-center justify-between px-3 py-1.5">
+        <p className="text-sm font-semibold">
           {itemCount === 0 ? "購物車" : `購物車 · ${itemCount} 件`}
         </p>
         {cart.length > 0 && (
@@ -550,15 +550,15 @@ export function CheckoutView() {
             {lines.map((line) => {
               const discounted = line.unitPrice !== line.product.price;
               return (
-                <li key={line.id} className="space-y-2 py-2.5">
-                  <div className="flex items-start gap-3">
+                <li key={line.id} className="space-y-1 py-1.5">
+                  <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-medium leading-snug">
+                      <p className="text-sm font-medium leading-tight">
                         {line.product.name}
                         {isCombo(line.product) ? "（套組）" : ""}
                       </p>
                       {isCombo(line.product) ? (
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[10px] leading-tight text-muted-foreground">
                           {comboPartsOf(line.product)
                             .map((part) => {
                               const item = state.products.find(
@@ -572,23 +572,15 @@ export function CheckoutView() {
                             .join("、")}
                         </p>
                       ) : null}
-                      <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">
-                        小計 {twd(line.amount)}
-                        {staffBuy
-                          ? " · 批價"
-                          : discounted
-                            ? " · 已改價"
-                            : ""}
-                      </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-0.5">
                       <button
                         type="button"
-                        className="flex size-10 items-center justify-center rounded-md border bg-background text-lg"
+                        className="flex size-7 items-center justify-center rounded border bg-background"
                         onClick={() => setQty(line.id, line.qty - 1)}
                         aria-label="減少"
                       >
-                        <Minus className="size-4" />
+                        <Minus className="size-3.5" />
                       </button>
                       <input
                         name={`cart-qty-${line.id}`}
@@ -598,102 +590,114 @@ export function CheckoutView() {
                         onChange={(event) =>
                           setQty(line.id, Number(event.target.value) || 0)
                         }
-                        className="h-10 w-12 rounded-md border bg-background text-center text-base tabular-nums"
+                        className="h-7 w-9 rounded border bg-background text-center text-sm tabular-nums"
                         aria-label={`${line.product.name} 數量`}
                       />
                       <button
                         type="button"
-                        className="flex size-10 items-center justify-center rounded-md border bg-background text-lg"
+                        className="flex size-7 items-center justify-center rounded border bg-background"
                         onClick={() => setQty(line.id, line.qty + 1)}
                         aria-label="增加"
                       >
-                        <Plus className="size-4" />
+                        <Plus className="size-3.5" />
                       </button>
                       <button
                         type="button"
-                        className="ml-0.5 flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                        className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
                         onClick={() => setQty(line.id, 0)}
                         aria-label={`移除 ${line.product.name}`}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5" />
                       </button>
                     </div>
                   </div>
-                  {staffBuy ? (
-                    <p className="text-xs tabular-nums text-muted-foreground">
-                      批價 {twd(line.unitPrice)}
-                      {line.product.price !== line.product.cost
-                        ? ` · 售價 ${twd(line.product.price)}`
-                        : ""}
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm text-muted-foreground">售價</span>
-                      <input
-                        name={`cart-price-${line.id}`}
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        value={line.unitPrice}
-                        onChange={(event) =>
-                          setLinePrice(line.id, event.target.value)
-                        }
-                        className="h-8 w-16 rounded-md border bg-background px-1 text-center text-base tabular-nums"
-                        aria-label={`${line.product.name} 售價`}
-                      />
-                      {discounted ? (
-                        <span className="text-xs text-muted-foreground">
-                          原價 {twd(line.product.price)}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        aria-pressed={line.priceReason === "瑕疵"}
-                        className={cn(
-                          "rounded-md px-2 py-1 text-sm font-medium",
-                          line.priceReason === "瑕疵"
-                            ? "bg-red-600 text-white"
-                            : "border text-muted-foreground",
-                        )}
-                        onClick={() => markPriceReason(line.id, "瑕疵")}
-                      >
-                        瑕疵
-                      </button>
-                      {discounted ? (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline"
-                          onClick={() => restorePrice(line.id)}
-                        >
-                          原價
-                        </button>
-                      ) : null}
-                      {line.qty > 1 ? (
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground underline"
-                          onClick={() => splitDefect(line.id)}
-                        >
-                          拆1件
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
-                  <label className="flex min-w-0 items-center gap-1.5">
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      備註
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      小計 {twd(line.amount)}
+                      {staffBuy
+                        ? " · 批價"
+                        : discounted
+                          ? " · 已改價"
+                          : ""}
                     </span>
-                    <input
-                      name={`cart-note-${line.id}`}
-                      value={line.note ?? ""}
-                      onChange={(event) =>
-                        setLineNote(line.id, event.target.value)
-                      }
-                      placeholder="可自己打"
-                      className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm outline-none focus-visible:border-ring"
-                      aria-label={`${line.product.name} 備註`}
-                    />
-                  </label>
+                    {staffBuy ? (
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {twd(line.unitPrice)}
+                        {line.product.price !== line.product.cost
+                          ? ` · 原售 ${twd(line.product.price)}`
+                          : ""}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-[11px] text-muted-foreground">
+                          售價
+                        </span>
+                        <input
+                          name={`cart-price-${line.id}`}
+                          type="number"
+                          min={0}
+                          inputMode="numeric"
+                          value={line.unitPrice}
+                          onChange={(event) =>
+                            setLinePrice(line.id, event.target.value)
+                          }
+                          className="h-6 w-14 rounded border bg-background px-1 text-center text-xs tabular-nums"
+                          aria-label={`${line.product.name} 售價`}
+                        />
+                        {discounted ? (
+                          <span className="text-[11px] text-muted-foreground">
+                            原價 {twd(line.product.price)}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          aria-pressed={line.priceReason === "瑕疵"}
+                          className={cn(
+                            "h-6 rounded px-1.5 text-[11px] font-medium",
+                            line.priceReason === "瑕疵"
+                              ? "bg-red-600 text-white"
+                              : "border text-muted-foreground",
+                          )}
+                          onClick={() => markPriceReason(line.id, "瑕疵")}
+                        >
+                          瑕疵
+                        </button>
+                        {discounted ? (
+                          <button
+                            type="button"
+                            className="text-[11px] text-muted-foreground underline"
+                            onClick={() => restorePrice(line.id)}
+                          >
+                            原價
+                          </button>
+                        ) : null}
+                        {line.qty > 1 ? (
+                          <button
+                            type="button"
+                            className="text-[11px] text-muted-foreground underline"
+                            onClick={() => splitDefect(line.id)}
+                          >
+                            拆1件
+                          </button>
+                        ) : null}
+                      </>
+                    )}
+                    <label className="flex min-w-[7rem] flex-1 items-center gap-1">
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        備註
+                      </span>
+                      <input
+                        name={`cart-note-${line.id}`}
+                        value={line.note ?? ""}
+                        onChange={(event) =>
+                          setLineNote(line.id, event.target.value)
+                        }
+                        placeholder="可自己打"
+                        className="h-6 min-w-0 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus-visible:border-ring"
+                        aria-label={`${line.product.name} 備註`}
+                      />
+                    </label>
+                  </div>
                 </li>
               );
             })}
