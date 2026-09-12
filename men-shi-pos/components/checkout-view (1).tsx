@@ -41,6 +41,7 @@ import {
   twd,
 } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { NoticeSplitPanel } from "@/components/notice-split-panel";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_NOTE = "正常販售";
@@ -867,6 +868,18 @@ export function CheckoutView() {
   return (
     <div className="flex min-h-[calc(100svh-2.25rem)] flex-col lg:flex-row">
       <section className="min-w-0 flex-1">
+        <NoticeSplitPanel
+          products={state.products}
+          onAdd={(items) => {
+            for (const item of items) {
+              const product = state.products.find(
+                (row) => row.id === item.productId,
+              );
+              if (product) addProduct(product, item.qty);
+            }
+            toast.success(`已加入收銀 ${items.length} 項`);
+          }}
+        />
         <div className="border-b bg-card px-3 py-2">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted-foreground">銷貨年月日</span>
