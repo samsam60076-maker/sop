@@ -9,20 +9,85 @@ export type NoticeItem = {
   matchedName: string | null;
 };
 
-function clean(text: string) {
-  return text.replace(/\u00a0/g, " ").replace(/[：﹕]/g, ":").trim();
+function toHalfWidthDigits(text: string) {
+  return text.replace(/[０-９]/g, (ch) =>
+    String.fromCharCode(ch.charCodeAt(0) - 0xff10 + 0x30),
+  );
 }
 
-function matchName(name: string, products: Product[]): Product | null {
+function clean(text: string) {
+  return toHalfWidthDigits(text)
+    .replace(/\u00a0/g, " ")
+    .replace(/[：﹕︰︓∶]/g, ":")
+    .replace(/[★☆＊*✦✧✨●■]+/g, " ")
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const NAME_RE =
+  /(?:到貨商品|商品名稱|品名|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?))\s*:?\s*(.+)$/i;
+const PRICE_RE =
+  /(?:單價|金額|售價|價錢|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)/i;
+const QTY_RE =
+  /(?:數量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
+const INLINE_RE =
+  /(?:到貨商品|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?))\s*:?\s*(.+?)\s+(?:單價|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)\s+(?:數量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
+
+function compact(text: string) {
+  return text.replace(/[\s★☆＊*·・\-_/]/g, "").toLowerCase();
+}
+
+function charsInOrder(query: string, name: string) {
+  let index = 0;
+  for (const ch of name) {
+    if (ch === query[index]) {
+      index += 1;
+      if (index === query.length) return true;
+    }
+  }
+  return false;
+}
+
+function pickUnique(list: Product[], unitPrice: number): Product | null {
+  if (list.length === 1) return list[0];
+  if (list.length > 1 && unitPrice > 0) {
+    const priced = list.filter((item) => item.price === unitPrice);
+    if (priced.length === 1) return priced[0];
+  }
+  return null;
+}
+
+function matchName(
+  name: string,
+  products: Product[],
+  unitPrice: number,
+): Product | null {
   const q = name.trim();
   if (!q) return null;
   const exact = products.find((item) => item.name === q);
   if (exact) return exact;
+
+  const qCompact = compact(q);
+  const compactExact = products.filter((item) => compact(item.name) === qCompact);
+  const uniqueCompact = pickUnique(compactExact, unitPrice);
+  if (uniqueCompact) return uniqueCompact;
+
   const hits = matchProducts(products, q);
-  if (hits.length === 1) return hits[0];
+  const uniqueHit = pickUnique(hits, unitPrice);
+  if (uniqueHit) return uniqueHit;
   const start = hits.filter((item) => item.name.startsWith(q));
-  if (start.length === 1) return start[0];
-  return hits[0] ?? null;
+  const uniqueStart = pickUnique(start, unitPrice);
+  if (uniqueStart) return uniqueStart;
+
+  // 「23蝦」對「23日蝦」：字依序出現，且名稱夠接近，才自動對。
+  if (qCompact.length < 2) return null;
+  const ordered = products.filter((item) => {
+    const n = compact(item.name);
+    if (!charsInOrder(qCompact, n)) return false;
+    return qCompact.length / n.length >= 0.5;
+  });
+  return pickUnique(ordered, unitPrice);
 }
 
 function pushItem(
@@ -36,7 +101,7 @@ function pushItem(
   if (!label) return;
   const amount = Math.max(1, Math.round(qty) || 1);
   const unitPrice = Math.max(0, Math.round(price) || 0);
-  const product = matchName(label, products);
+  const product = matchName(label, products, unitPrice);
   items.push({
     name: label,
     qty: amount,
@@ -51,34 +116,29 @@ export function parseArrivalNotice(
   raw: string,
   products: Product[],
 ): NoticeItem[] {
-  const text = clean(raw);
-  if (!text) return [];
   const items: NoticeItem[] = [];
-
-  const block = /到貨商品\s*:?\s*(.+?)[\s,，]*單價\s*:?\s*[\$＄]?\s*(\d+)[\s,，]*數量\s*:?\s*[+＋]?\s*(\d+)/gi;
-  let found = false;
-  for (const match of text.matchAll(block)) {
-    found = true;
-    pushItem(items, products, match[1], Number(match[3]), Number(match[2]));
-  }
-  if (found) return items;
-
-  const lines = text.split(/\r?\n/).map(clean).filter(Boolean);
+  const lines = raw.split(/\r?\n/).map(clean).filter(Boolean);
   let name = "";
   let price = 0;
   for (const line of lines) {
-    const named = line.match(/^到貨商品\s*:?\s*(.+)$/);
+    const named = line.match(NAME_RE);
     if (named) {
-      name = named[1].trim();
+      name = named[1].replace(/(?:單價|unit\s*price|price).*$/i, "").trim();
       price = 0;
+      const inline = line.match(INLINE_RE);
+      if (inline) {
+        pushItem(items, products, inline[1], Number(inline[3]), Number(inline[2]));
+        name = "";
+        price = 0;
+      }
       continue;
     }
-    const priced = line.match(/^單價\s*:?\s*[\$＄]?\s*(\d+)/);
+    const priced = line.match(PRICE_RE);
     if (priced) {
       price = Number(priced[1]);
       continue;
     }
-    const qty = line.match(/^數量\s*:?\s*[+＋]?\s*(\d+)/);
+    const qty = line.match(QTY_RE);
     if (qty && name) {
       pushItem(items, products, name, Number(qty[1]), price);
       name = "";
@@ -87,8 +147,14 @@ export function parseArrivalNotice(
   }
   if (items.length > 0) return items;
 
-  const dotted =
-    /[·・]\s*(.+?)\s*[×xX*]\s*(\d+)\s*[\$＄]?\s*(\d+)/g;
+  const text = lines.join("\n");
+  const block = new RegExp(INLINE_RE.source, "gi");
+  for (const match of text.matchAll(block)) {
+    pushItem(items, products, match[1], Number(match[3]), Number(match[2]));
+  }
+  if (items.length > 0) return items;
+
+  const dotted = /[·・]\s*(.+?)\s*[×xX]\s*(\d+)\s*[\$＄]?\s*(\d+)/g;
   for (const match of text.matchAll(dotted)) {
     pushItem(items, products, match[1], Number(match[2]), Number(match[3]));
   }
