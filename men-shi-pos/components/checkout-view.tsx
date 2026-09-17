@@ -46,6 +46,13 @@ import { cn } from "@/lib/utils";
 
 const DEFAULT_NOTE = "正常販售";
 const STAFF_NOTE = "員工價";
+const GROUP_NOTE = "團媽價";
+
+function wholesaleMark(note: string) {
+  if (note.includes(GROUP_NOTE)) return " · 團媽價";
+  if (note.includes(STAFF_NOTE)) return " · 員工價";
+  return "";
+}
 
 function composeLineNote(line: {
   priceReason?: PriceReason;
@@ -129,7 +136,10 @@ export function CheckoutView() {
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundNote, setRefundNote] = useState("");
-  const [staffBuy, setStaffBuy] = useState(false);
+  const [staffBuyMode, setStaffBuyMode] = useState<"off" | "staff" | "group">(
+    "off",
+  );
+  const staffBuy = staffBuyMode !== "off";
   const [arrange, setArrange] = useState(false);
   const [dayLogOpen, setDayLogOpen] = useState(false);
   const [saleBarOpen, setSaleBarOpen] = useState(false);
@@ -242,9 +252,9 @@ export function CheckoutView() {
     return merged;
   }
 
-  function toggleStaffBuy(next: boolean) {
-    setStaffBuy(next);
-    setCart((current) => retagCart(current, next));
+  function applyStaffBuyMode(next: "off" | "staff" | "group") {
+    setStaffBuyMode(next);
+    setCart((current) => retagCart(current, next !== "off"));
   }
 
   function moveCheckout(productId: string, dir: "front" | "left" | "right") {
@@ -394,8 +404,11 @@ export function CheckoutView() {
     const parts = [
       ...new Set(current.map(composeLineNote).filter(Boolean)),
     ];
-    if (staffBuy) {
+    if (staffBuyMode === "staff") {
       return parts.length > 0 ? `${STAFF_NOTE}；${parts.join("；")}` : STAFF_NOTE;
+    }
+    if (staffBuyMode === "group") {
+      return parts.length > 0 ? `${GROUP_NOTE}；${parts.join("；")}` : GROUP_NOTE;
     }
     return parts.length > 0 ? parts.join("；") : DEFAULT_NOTE;
   }
@@ -700,7 +713,11 @@ export function CheckoutView() {
       <div className="border-t bg-card px-2 py-1.5">
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <span className="text-xs text-muted-foreground">
-            {staffBuy ? "應收（員工批價）" : "應收（現金）"}
+            {staffBuyMode === "group"
+              ? "應收（團媽批價）"
+              : staffBuy
+                ? "應收（員工批價）"
+                : "應收（現金）"}
           </span>
           <span className="font-heading text-xl font-semibold tabular-nums">
             {twd(total)}
@@ -891,7 +908,11 @@ export function CheckoutView() {
             >
               <span>
                 銷貨 {saleDate.replace(/^(\d{4})-0?(\d+)-0?(\d+)$/, "$1年$2月$3日")} ·{" "}
-                {staffBuy ? "員工購買" : "一般"}
+                {staffBuyMode === "staff"
+                  ? "員工購買"
+                  : staffBuyMode === "group"
+                    ? "團媽價"
+                    : "一般"}
               </span>
               <span>{saleBarOpen ? "收起" : "打開看"}</span>
             </button>
@@ -904,11 +925,11 @@ export function CheckoutView() {
                     type="button"
                     className={cn(
                       "rounded px-1.5 py-0.5 text-[11px]",
-                      !staffBuy
+                      staffBuyMode === "off"
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground",
                     )}
-                    onClick={() => toggleStaffBuy(false)}
+                    onClick={() => applyStaffBuyMode("off")}
                   >
                     一般
                   </button>
@@ -916,13 +937,25 @@ export function CheckoutView() {
                     type="button"
                     className={cn(
                       "rounded px-1.5 py-0.5 text-[11px]",
-                      staffBuy
+                      staffBuyMode === "staff"
                         ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground",
                     )}
-                    onClick={() => toggleStaffBuy(true)}
+                    onClick={() => applyStaffBuyMode("staff")}
                   >
                     員工購買
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded px-1.5 py-0.5 text-[11px]",
+                      staffBuyMode === "group"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground",
+                    )}
+                    onClick={() => applyStaffBuyMode("group")}
+                  >
+                    團媽價
                   </button>
                 </div>
                 <button
@@ -1169,7 +1202,7 @@ export function CheckoutView() {
                 <DialogTitle>銷貨完成</DialogTitle>
                 <DialogDescription>
                   {formatDateYmd(receipt.createdAt)} · {receipt.number} · 現金
-                  {receipt.note.includes(STAFF_NOTE) ? " · 員工價" : ""}
+                  {wholesaleMark(receipt.note)}
                 </DialogDescription>
               </DialogHeader>
               <div className="rounded-xl border bg-muted/40 p-3 text-sm">
@@ -1235,7 +1268,7 @@ export function CheckoutView() {
                 <DialogDescription>
                   {formatDateYmd(openSale.createdAt)}{" "}
                   {formatTime(openSale.createdAt)} · {openSale.items.length}項
-                  {openSale.note.includes(STAFF_NOTE) ? " · 員工價" : ""}
+                  {wholesaleMark(openSale.note)}
                 </DialogDescription>
               </DialogHeader>
               <div className="max-h-72 overflow-y-auto rounded-xl border bg-muted/40 p-3 text-sm">
