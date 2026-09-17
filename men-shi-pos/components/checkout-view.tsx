@@ -896,68 +896,69 @@ export function CheckoutView() {
         />
         <div className="border-b bg-card px-3 py-2">
           <div className="mb-1.5">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-2 text-left text-[11px] text-muted-foreground"
-              onClick={() => {
-                setSaleBarOpen((current) => {
-                  if (current) setArrange(false);
-                  return !current;
-                });
-              }}
-            >
-              <span>
-                銷貨 {saleDate.replace(/^(\d{4})-0?(\d+)-0?(\d+)$/, "$1年$2月$3日")} ·{" "}
-                {staffBuyMode === "staff"
-                  ? "員工購買"
-                  : staffBuyMode === "group"
-                    ? "團媽價"
-                    : "一般"}
-              </span>
-              <span>{saleBarOpen ? "收起" : "打開看"}</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-[11px] text-muted-foreground"
+                onClick={() => {
+                  setSaleBarOpen((current) => {
+                    if (current) setArrange(false);
+                    return !current;
+                  });
+                }}
+              >
+                <span>
+                  銷貨{" "}
+                  {saleDate.replace(
+                    /^(\d{4})-0?(\d+)-0?(\d+)$/,
+                    "$1年$2月$3日",
+                  )}
+                </span>
+                <span>{saleBarOpen ? "收起日期" : "改日期／位置"}</span>
+              </button>
+              <div className="flex rounded-md border p-0.5">
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[11px]",
+                    staffBuyMode === "off"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground",
+                  )}
+                  onClick={() => applyStaffBuyMode("off")}
+                >
+                  一般
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[11px]",
+                    staffBuyMode === "staff"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground",
+                  )}
+                  onClick={() => applyStaffBuyMode("staff")}
+                >
+                  員工價
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[11px]",
+                    staffBuyMode === "group"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground",
+                  )}
+                  onClick={() => applyStaffBuyMode("group")}
+                >
+                  團媽價
+                </button>
+              </div>
+            </div>
             {saleBarOpen ? (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">銷貨年月日</span>
                 <YmdPicker compact value={saleDate} onChange={setSaleDate} />
-                <div className="flex rounded-md border p-0.5">
-                  <button
-                    type="button"
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px]",
-                      staffBuyMode === "off"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground",
-                    )}
-                    onClick={() => applyStaffBuyMode("off")}
-                  >
-                    一般
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px]",
-                      staffBuyMode === "staff"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground",
-                    )}
-                    onClick={() => applyStaffBuyMode("staff")}
-                  >
-                    員工購買
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px]",
-                      staffBuyMode === "group"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground",
-                    )}
-                    onClick={() => applyStaffBuyMode("group")}
-                  >
-                    團媽價
-                  </button>
-                </div>
                 <button
                   type="button"
                   className={cn(
