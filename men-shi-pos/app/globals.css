@@ -156,6 +156,9 @@
     .report-print-all .rp-month-daily {
       display: none !important;
     }
+    .rp-summary {
+      display: none !important;
+    }
     @page {
       size: A4;
       margin: 8mm;
