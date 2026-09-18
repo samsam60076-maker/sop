@@ -565,21 +565,23 @@ export function StockReportView() {
           />
         </div>
 
-        <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7 print:hidden rp-hq">
+        <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7 print:hidden rp-hq">
           {hqRows.map((row) => (
             <button
               key={row.id}
               type="button"
               onClick={() => switchStore(row.id)}
               className={cn(
-                "rounded-lg border px-2 py-1.5 text-left",
+                "rounded-md border px-1.5 py-1 text-left",
                 storeId === row.id
                   ? "border-primary bg-primary/5"
                   : "bg-background hover:bg-muted/40",
               )}
             >
-              <p className="text-[11px] text-muted-foreground">{row.name}本月</p>
-              <p className="font-heading text-base font-semibold tabular-nums">
+              <p className="text-[10px] leading-none text-muted-foreground">
+                {row.name}本月
+              </p>
+              <p className="font-heading truncate text-sm font-semibold tabular-nums leading-tight">
                 {twd(row.revenue)}
               </p>
             </button>
@@ -587,7 +589,7 @@ export function StockReportView() {
         </div>
 
         <div className="rp-summary print:hidden">
-        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+        <div className="mt-1 grid grid-cols-4 gap-1">
           <Summary
             label={`${month}/${date}銷售`}
             value={`${daySaleTotals.qty}件`}
@@ -616,7 +618,7 @@ export function StockReportView() {
             value={twd(monthNet)}
           />
         </div>
-        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+        <div className="mt-1 grid grid-cols-4 gap-1">
           <Summary
             label={`${month}月進貨售價`}
             value={twd(monthBuy.retailAmount)}
@@ -1453,15 +1455,15 @@ function Summary({
   hint?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-md border bg-background px-2 py-1">
-      <p className="truncate text-[11px] leading-none text-muted-foreground">
+    <div className="min-w-0 rounded-md border bg-background px-1.5 py-0.5">
+      <p className="truncate text-[10px] leading-none text-muted-foreground">
         {label}
       </p>
-      <p className="font-heading truncate text-base font-semibold tabular-nums leading-tight">
+      <p className="font-heading truncate text-sm font-semibold tabular-nums leading-tight">
         {value}
       </p>
       {hint ? (
-        <p className="truncate text-[11px] leading-none text-muted-foreground">
+        <p className="truncate text-[10px] leading-none text-muted-foreground">
           {hint}
         </p>
       ) : null}
