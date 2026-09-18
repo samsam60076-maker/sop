@@ -470,7 +470,8 @@ export function StockReportView() {
                     {storeName} · {year}年{month}月 每日收銀與支出
                   </p>
                   <p className="text-sm">
-                    淨收銀 {twd(monthDailyTotals.netAmount)} · 支出{" "}
+                    售出 {twd(monthDailyTotals.saleAmount)} · 批發{" "}
+                    {twd(monthDailyTotals.costAmount)} · 支出{" "}
                     {twd(monthDailyTotals.expenseAmount)}
                   </p>
                 </>
@@ -648,7 +649,7 @@ export function StockReportView() {
           {year}年{month}月每日收銀
         </h2>
         <p className="mt-1 text-xs text-muted-foreground print:hidden">
-          含退款、員工價、團媽價與當日支出。列印請選「當月每日收銀＋支出」。
+          含員工價、團媽價。列印只印當日售出、批發與支出。
         </p>
       </section>
       <div className="rp-month-daily overflow-x-auto">
@@ -656,12 +657,15 @@ export function StockReportView() {
           <TableHeader>
             <TableRow>
               <TableHead>日</TableHead>
-              <TableHead className="text-right">收銀</TableHead>
-              <TableHead className="text-right">其中員工／團媽</TableHead>
-              <TableHead className="text-right">退款</TableHead>
-              <TableHead className="text-right">淨收銀</TableHead>
+              <TableHead className="text-right">收銀售出</TableHead>
+              <TableHead className="text-right">收銀批發</TableHead>
+              <TableHead className="text-right print:hidden">
+                其中員工／團媽
+              </TableHead>
+              <TableHead className="text-right print:hidden">退款</TableHead>
+              <TableHead className="text-right print:hidden">淨收銀</TableHead>
               <TableHead className="text-right">支出</TableHead>
-              <TableHead className="text-right">當日結餘</TableHead>
+              <TableHead className="text-right print:hidden">當日結餘</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -683,18 +687,21 @@ export function StockReportView() {
                     {row.saleAmount ? twd(row.saleAmount) : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
+                    {row.costAmount ? twd(row.costAmount) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums print:hidden">
                     {row.staffAmount ? twd(row.staffAmount) : "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular-nums print:hidden">
                     {row.refundAmount ? twd(row.refundAmount) : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
+                  <TableCell className="text-right font-semibold tabular-nums print:hidden">
                     {row.netAmount ? twd(row.netAmount) : "—"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {row.expenseAmount ? twd(row.expenseAmount) : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">
+                  <TableCell className="text-right font-semibold tabular-nums print:hidden">
                     {idle ? "—" : twd(row.balance)}
                   </TableCell>
                 </TableRow>
@@ -708,18 +715,21 @@ export function StockReportView() {
                 {twd(monthDailyTotals.saleAmount)}
               </TableCell>
               <TableCell className="text-right font-semibold tabular-nums">
+                {twd(monthDailyTotals.costAmount)}
+              </TableCell>
+              <TableCell className="text-right font-semibold tabular-nums print:hidden">
                 {twd(monthDailyTotals.staffAmount)}
               </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
+              <TableCell className="text-right font-semibold tabular-nums print:hidden">
                 {twd(monthDailyTotals.refundAmount)}
               </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
+              <TableCell className="text-right font-semibold tabular-nums print:hidden">
                 {twd(monthDailyTotals.netAmount)}
               </TableCell>
               <TableCell className="text-right font-semibold tabular-nums">
                 {twd(monthDailyTotals.expenseAmount)}
               </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
+              <TableCell className="text-right font-semibold tabular-nums print:hidden">
                 {twd(monthDailyTotals.balance)}
               </TableCell>
             </TableRow>
