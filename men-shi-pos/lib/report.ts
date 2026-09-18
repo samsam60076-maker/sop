@@ -468,7 +468,7 @@ export function marginLabel(rate: number | null) {
 }
 
 export function isStaffSaleLine(line: Pick<SaleDetailLine, "note" | "saleNote">) {
-  return /員工/.test(line.note) || /員工/.test(line.saleNote);
+  return /員工|團媽/.test(line.note) || /員工|團媽/.test(line.saleNote);
 }
 
 export type MonthDayCashRow = {
