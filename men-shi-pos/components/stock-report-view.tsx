@@ -461,7 +461,7 @@ export function StockReportView() {
                     {storeName} · {periodLabel} 進貨商品
                   </p>
                   <p className="text-sm">
-                    {buyTotals.qty}件 · 批價 {twd(buyTotals.amount)}
+                    {buyTotals.qty}件 · 售價 {twd(buyTotals.retailAmount)}
                   </p>
                 </>
               ) : printJob === "monthDaily" ? (
@@ -1035,7 +1035,7 @@ export function StockReportView() {
             "print:hidden",
         )}
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <h2 className="text-sm font-semibold">進貨 · {periodLabel}</h2>
           <PickBar
             count={pickedPurchases.size}
@@ -1075,13 +1075,15 @@ export function StockReportView() {
                 <TableHead>年</TableHead>
                 <TableHead>月</TableHead>
                 <TableHead>日</TableHead>
-                <TableHead>時間</TableHead>
-                <TableHead>單號</TableHead>
+                <TableHead className="print:hidden">時間</TableHead>
+                <TableHead className="print:hidden">單號</TableHead>
                 <TableHead>商品名稱</TableHead>
                 <TableHead className="text-right">數量</TableHead>
                 <TableHead className="text-right">售價</TableHead>
                 <TableHead className="text-right">批價</TableHead>
-                <TableHead className="text-right">進貨批價合計</TableHead>
+                <TableHead className="text-right print:hidden">
+                  進貨批價合計
+                </TableHead>
                 <TableHead>備註</TableHead>
                 <TableHead className="w-12 text-right print:hidden">
                   刪除
@@ -1111,10 +1113,12 @@ export function StockReportView() {
                     <TableCell className="tabular-nums">{ymd.year}</TableCell>
                     <TableCell className="tabular-nums">{ymd.month}</TableCell>
                     <TableCell className="tabular-nums">{ymd.day}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-muted-foreground print:hidden">
                       {formatTime(line.createdAt)}
                     </TableCell>
-                    <TableCell className="font-medium">{line.number}</TableCell>
+                    <TableCell className="font-medium print:hidden">
+                      {line.number}
+                    </TableCell>
                     <TableCell>{line.name}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">
                       {line.qty}
@@ -1125,7 +1129,7 @@ export function StockReportView() {
                     <TableCell className="text-right tabular-nums">
                       {twd(line.unitCost)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-right tabular-nums print:hidden">
                       {twd(line.amount)}
                     </TableCell>
                     <TableCell className="max-w-[10rem] truncate text-sm text-muted-foreground">
@@ -1148,7 +1152,16 @@ export function StockReportView() {
             </TableBody>
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={7} className="font-semibold">
+                <TableCell
+                  colSpan={7}
+                  className="font-semibold print:hidden"
+                >
+                  進貨合計
+                </TableCell>
+                <TableCell
+                  colSpan={4}
+                  className="hidden font-semibold print:table-cell"
+                >
                   進貨合計
                 </TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">
@@ -1158,7 +1171,7 @@ export function StockReportView() {
                   {twd(buyTotals.retailAmount)}
                 </TableCell>
                 <TableCell />
-                <TableCell className="text-right font-semibold tabular-nums">
+                <TableCell className="text-right font-semibold tabular-nums print:hidden">
                   {twd(buyTotals.amount)}
                 </TableCell>
                 <TableCell />
