@@ -150,6 +150,7 @@
     .report-print-month-daily .rp-sales,
     .report-print-month-daily .rp-returns,
     .report-print-month-daily .rp-purchases,
+    .report-print-month-daily .rp-expenses,
     .report-print-month-daily .rp-stock {
       display: none !important;
     }
