@@ -14,7 +14,7 @@ const NAV = [
   { href: "/stocktake", label: "盤點" },
   { href: "/sales", label: "銷貨" },
   { href: "/expenses", label: "支出" },
-  { href: "/products", label: "總商品" },
+  { href: "/products", label: "總商品(全門市-請勿變更)" },
   { href: "/report", label: "總表" },
   { href: "/shop", label: "備份門市資料" },
 ] as const;
