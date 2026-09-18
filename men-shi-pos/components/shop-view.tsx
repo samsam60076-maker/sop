@@ -28,7 +28,6 @@ export function ShopView() {
     updateSettings,
     exportBackup,
     importBackup,
-    spreadCatalogNow,
     exportCatalog,
     importCatalog,
   } = useStore();
@@ -221,26 +220,6 @@ export function ShopView() {
               </Button>
             </div>
           ) : null}
-        </div>
-      </section>
-
-      <section className="mt-8 border-t pt-6">
-        <h2 className="font-heading text-lg font-semibold">這台電腦上面切七間</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          總部這台要切換西螺／斗南／虎尾時才按。別間自己的電腦不用按這顆，用上面拖檔或選檔即可。
-        </p>
-        <div className="mt-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              spreadCatalogNow();
-              toast.success("這台電腦的七間門市已套上同一套名稱售價");
-              window.location.reload();
-            }}
-          >
-            這台電腦：套到七間
-          </Button>
         </div>
       </section>
 
