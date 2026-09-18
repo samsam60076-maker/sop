@@ -476,6 +476,7 @@ export type MonthDayCashRow = {
   day: number;
   saleQty: number;
   saleAmount: number;
+  costAmount: number;
   staffAmount: number;
   refundAmount: number;
   netAmount: number;
@@ -510,6 +511,7 @@ export function buildMonthDailyCash(
       day: date,
       saleQty: saleTotals.qty,
       saleAmount: saleTotals.amount,
+      costAmount: saleTotals.costAmount,
       staffAmount,
       refundAmount,
       netAmount,
@@ -525,6 +527,7 @@ export function monthDailyCashTotals(rows: MonthDayCashRow[]) {
     (sum, row) => ({
       saleQty: sum.saleQty + row.saleQty,
       saleAmount: sum.saleAmount + row.saleAmount,
+      costAmount: sum.costAmount + row.costAmount,
       staffAmount: sum.staffAmount + row.staffAmount,
       refundAmount: sum.refundAmount + row.refundAmount,
       netAmount: sum.netAmount + row.netAmount,
@@ -534,6 +537,7 @@ export function monthDailyCashTotals(rows: MonthDayCashRow[]) {
     {
       saleQty: 0,
       saleAmount: 0,
+      costAmount: 0,
       staffAmount: 0,
       refundAmount: 0,
       netAmount: 0,
