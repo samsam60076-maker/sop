@@ -461,7 +461,7 @@ export function StockReportView() {
                     {storeName} · {periodLabel} 進貨商品
                   </p>
                   <p className="text-sm">
-                    {buyTotals.qty}件 · 售價 {twd(buyTotals.retailAmount)}
+                    售價 {twd(buyTotals.retailAmount)} · 批價 {twd(buyTotals.amount)}
                   </p>
                 </>
               ) : printJob === "monthDaily" ? (
@@ -1174,13 +1174,17 @@ export function StockReportView() {
                 >
                   進貨合計
                 </TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">
+                <TableCell className="text-right font-semibold tabular-nums print:hidden">
                   {buyTotals.qty}
                 </TableCell>
+                <TableCell className="hidden print:table-cell" />
                 <TableCell className="text-right font-semibold tabular-nums">
                   {twd(buyTotals.retailAmount)}
                 </TableCell>
-                <TableCell />
+                <TableCell className="hidden text-right font-semibold tabular-nums print:table-cell">
+                  {twd(buyTotals.amount)}
+                </TableCell>
+                <TableCell className="print:hidden" />
                 <TableCell className="text-right font-semibold tabular-nums print:hidden">
                   {twd(buyTotals.amount)}
                 </TableCell>
