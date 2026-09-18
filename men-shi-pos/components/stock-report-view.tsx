@@ -590,7 +590,7 @@ export function StockReportView() {
         </div>
 
         <div className="rp-summary print:hidden">
-        <div className="mt-1 grid grid-cols-4 gap-1">
+        <div className="mt-0.5 grid grid-cols-4 gap-0.5">
           <Summary
             label={`${month}/${date}銷售`}
             value={`${daySaleTotals.qty}件`}
@@ -619,7 +619,7 @@ export function StockReportView() {
             value={twd(monthNet)}
           />
         </div>
-        <div className="mt-1 grid grid-cols-4 gap-1">
+        <div className="mt-0.5 grid grid-cols-4 gap-0.5">
           <Summary
             label={`${month}月進貨售價`}
             value={twd(monthBuy.retailAmount)}
@@ -1482,15 +1482,15 @@ function Summary({
   hint?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-md border bg-background px-1.5 py-0.5">
-      <p className="truncate text-[10px] leading-none text-muted-foreground">
+    <div className="min-w-0 rounded border bg-background px-1 py-px">
+      <p className="truncate text-[8px] leading-tight text-muted-foreground">
         {label}
       </p>
-      <p className="font-heading truncate text-sm font-semibold tabular-nums leading-tight">
+      <p className="font-heading truncate text-[11px] font-semibold tabular-nums leading-tight">
         {value}
       </p>
       {hint ? (
-        <p className="truncate text-[10px] leading-none text-muted-foreground">
+        <p className="truncate text-[8px] leading-tight text-muted-foreground">
           {hint}
         </p>
       ) : null}
