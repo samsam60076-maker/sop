@@ -471,9 +471,11 @@ export function ProductsView() {
     <div className="flex flex-col pb-28">
       <div className="border-b bg-card px-3 py-2 md:px-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="font-heading text-lg font-semibold">總商品列表</h1>
+          <h1 className="font-heading text-lg font-semibold">
+            總商品列表(全門市-請勿變更)
+          </h1>
           <p className="mt-1 w-full text-xs leading-5 text-muted-foreground">
-            別間門市的電腦請到
+            這份名稱售價七間共用。別間門市請勿在這裡改。請到
             <a href="/shop" className="underline">
               備份門市資料
             </a>
