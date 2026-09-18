@@ -586,7 +586,7 @@ export function StockReportView() {
           ))}
         </div>
 
-        <div className="rp-summary">
+        <div className="rp-summary print:hidden">
         <div className="mt-1.5 grid grid-cols-4 gap-1.5">
           <Summary
             label={`${month}/${date}銷售`}
@@ -646,7 +646,7 @@ export function StockReportView() {
           {year}年{month}月每日收銀
         </h2>
         <p className="mt-1 text-xs text-muted-foreground print:hidden">
-          含退款、員工價與當日支出。列印請選「當月每日收銀＋支出」。
+          含退款、員工價、團媽價與當日支出。列印請選「當月每日收銀＋支出」。
         </p>
       </section>
       <div className="rp-month-daily overflow-x-auto">
@@ -655,7 +655,7 @@ export function StockReportView() {
             <TableRow>
               <TableHead>日</TableHead>
               <TableHead className="text-right">收銀</TableHead>
-              <TableHead className="text-right">其中員工價</TableHead>
+              <TableHead className="text-right">其中員工／團媽</TableHead>
               <TableHead className="text-right">退款</TableHead>
               <TableHead className="text-right">淨收銀</TableHead>
               <TableHead className="text-right">支出</TableHead>
@@ -1413,6 +1413,7 @@ export function StockReportView() {
 function saleKind(line: SaleDetailLine) {
   const note = line.note.trim();
   if (/報廢|損壞/.test(note)) return "報廢";
+  if (/團媽/.test(note)) return "團媽價";
   if (/員工/.test(note)) return "員工價";
   if (note.includes("特價")) return "特價";
   if (note.includes("瑕疵")) return "瑕疵";
@@ -1427,7 +1428,7 @@ function KindMark({ label }: { label: string }) {
       ? "border-destructive/40 bg-destructive/10 text-destructive"
       : label === "特價" || label === "改價"
         ? "border-amber-400/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        : label === "員工價"
+        : label === "員工價" || label === "團媽價"
           ? "border-sky-400/60 bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-100"
           : "border-border bg-muted text-foreground";
   return (
