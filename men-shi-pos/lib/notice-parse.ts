@@ -99,6 +99,26 @@ function matchName(
   const uniqueCompact = pickUnique(compactExact, unitPrice);
   if (uniqueCompact) return uniqueCompact;
 
+  if (qCompact.length >= 2) {
+    const contained = products.filter((item) =>
+      compact(item.name).includes(qCompact),
+    );
+    const uniqueContained = pickUnique(contained, unitPrice);
+    if (uniqueContained) return uniqueContained;
+    if (contained.length > 1) {
+      const ended = contained.filter((item) =>
+        compact(item.name).endsWith(qCompact),
+      );
+      if (ended.length === 1) return ended[0];
+      const tight = contained.filter(
+        (item) => qCompact.length / compact(item.name).length >= 0.5,
+      );
+      const uniqueTight = pickUnique(tight, unitPrice);
+      if (uniqueTight) return uniqueTight;
+      if (ended.length > 0) return ended[0];
+    }
+  }
+
   const hits = matchProducts(products, q);
   const uniqueHit = pickUnique(hits, unitPrice);
   if (uniqueHit) return uniqueHit;
@@ -211,6 +231,27 @@ export function parseArrivalNotice(
   return items;
 }
 
+const PACK_UNIT =
+  "(?:包|盒|袋|組|份|顆|個|瓶|杯|箱|串|隻|尾|條)";
+
+function parsePackedUnitLines(raw: string, products: Product[]): NoticeItem[] {
+  const items: NoticeItem[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const spaced = toHalfWidthDigits(line).replace(/[＋]/g, "+").trim();
+    if (!spaced) continue;
+    const packed = spaced.replace(/\s+/g, "");
+    const withUnit = packed.match(new RegExp(`^(.+?)(\\d+)${PACK_UNIT}$`));
+    const noUnit = packed.match(/^(.+?)(\d+)$/);
+    const hit = withUnit ?? (noUnit && /[\u4e00-\u9fff]/.test(noUnit[1]) ? noUnit : null);
+    if (!hit) continue;
+    const name = hit[1].trim();
+    const qty = Number(hit[2]);
+    if (!name || !Number.isFinite(qty) || qty <= 0) continue;
+    pushItem(items, products, name, qty, 0);
+  }
+  return items;
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -256,8 +297,10 @@ function parseCatalogPurchase(raw: string, products: Product[]): NoticeItem[] {
   return items;
 }
 
-/** 貼上進貨文字：到貨訊息、茶葉蛋*10、白蝦 5 120，拆成商品、數量、批價。 */
+/** 貼上進貨文字：香煎雞腿排20包、到貨訊息，拆成商品、數量。 */
 export function parsePurchasePaste(raw: string, products: Product[]): NoticeItem[] {
+  const packed = parsePackedUnitLines(raw, products);
+  if (packed.length > 0) return packed;
   const notice = parseArrivalNotice(raw, products);
   if (notice.length > 0) return notice;
   return parseCatalogPurchase(raw, products);

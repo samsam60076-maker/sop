@@ -16,11 +16,11 @@ export function PurchasePastePanel({
   const [text, setText] = useState("");
   const [rows, setRows] = useState<NoticeItem[] | null>(null);
 
-  function split() {
-    const next = parsePurchasePaste(text, products);
+  function split(nextText = text) {
+    const next = parsePurchasePaste(nextText, products);
     setRows(next);
     if (next.length === 0) {
-      toast.error("認不出商品。可貼 茶葉蛋*10 或到貨商品／數量／單價");
+      toast.error("認不出商品。可貼 香煎雞腿排20包，一行一項");
     }
   }
 
@@ -34,7 +34,7 @@ export function PurchasePastePanel({
         <button
           type="button"
           className="h-6 rounded bg-primary px-2 text-xs text-primary-foreground"
-          onClick={split}
+          onClick={() => split()}
         >
           幫我拆開
         </button>
@@ -56,12 +56,14 @@ export function PurchasePastePanel({
       <textarea
         value={text}
         onChange={(event) => {
-          setText(event.target.value);
-          setRows(null);
+          const value = event.target.value;
+          setText(value);
+          const next = parsePurchasePaste(value, products);
+          setRows(next.length > 0 ? next : null);
         }}
         rows={2}
         className="mt-1 w-full resize-y rounded border bg-background px-1.5 py-1 text-xs leading-snug"
-        placeholder={"茶葉蛋*10\n白蝦 5 120\n到貨商品：糙米腸\n單價：80\n數量：+2"}
+        placeholder={"香煎雞腿排20包\n國王白蝦14盒\n魷魚翅10包"}
       />
       {rows && rows.length > 0 ? (
         <ul className="mt-1 space-y-0.5 text-xs">
