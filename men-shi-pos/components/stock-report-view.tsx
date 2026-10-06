@@ -27,6 +27,8 @@ import {
   reportTotals,
   returnDetailTotals,
   saleDetailTotals,
+  summarizeSoldProducts,
+  chunkSoldProducts,
   grossMargin,
   marginLabel,
   stockChangeNote,
@@ -186,6 +188,8 @@ export function StockReportView() {
   const spendTotal = expenseTotals(expenseLines);
   const refundTotal = returnDetailTotals(returnLines);
   const daySaleTotals = saleDetailTotals(daySales);
+  const soldRows = useMemo(() => summarizeSoldProducts(daySales), [daySales]);
+  const soldCols = useMemo(() => chunkSoldProducts(soldRows, 3), [soldRows]);
   const dayRefund = returnDetailTotals(dayReturns).amount;
   const dayRevenue = daySaleTotals.amount - dayRefund;
   const monthRevenue = saleDetailTotals(monthSales);
@@ -448,10 +452,11 @@ export function StockReportView() {
               {printJob === "dayCash" ? (
                 <>
                   <p className="font-semibold">
-                    {storeName} · {year}年{month}月{date}日 當日收銀退款
+                    {storeName}銷售表 · {month}/{date}
                   </p>
                   <p className="text-sm">
-                    收銀 {twd(dayRevenue)}
+                    今天總共販售 {soldRows.length} 項 · {daySaleTotals.qty} 件 · 金額{" "}
+                    {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
                     {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
                   </p>
                 </>
@@ -737,7 +742,95 @@ export function StockReportView() {
         </Table>
       </div>
 
-      <section className="rp-sales border-b px-3 py-2 md:px-4">
+      {period === "day" ? (
+      <section className="rp-day-sold border-b px-3 py-2 md:px-4 print:px-0 print:py-0">
+        <h2 className="text-sm font-semibold print:hidden">
+          今日販售統計 · {month}/{date}
+        </h2>
+        <p className="text-[11px] tabular-nums text-muted-foreground print:hidden">
+          今天總共販售 {soldRows.length} 項 · {daySaleTotals.qty} 件 · 金額{" "}
+          {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
+        </p>
+        {soldRows.length === 0 ? (
+          <p className="py-3 text-center text-[13px] text-muted-foreground print:hidden">
+            這天還沒有販售
+          </p>
+        ) : (
+          <div className="rp-day-sold-grid mt-1 grid grid-cols-1 gap-2 md:grid-cols-3">
+            {soldCols.map((col, colIndex) => {
+              const colQty = col.reduce((sum, row) => sum + row.qty, 0);
+              const colAmount = col.reduce((sum, row) => sum + row.amount, 0);
+              const colCost = col.reduce((sum, row) => sum + row.costAmount, 0);
+              return (
+                <table
+                  key={colIndex}
+                  className="w-full text-[11px] print:text-[10px]"
+                >
+                  <thead>
+                    <tr className="border-b">
+                      <th className="py-0.5 text-left font-semibold">品項</th>
+                      <th className="num py-0.5 text-right font-semibold">
+                        賣價
+                      </th>
+                      <th className="num py-0.5 text-right font-semibold">
+                        數量
+                      </th>
+                      <th className="num py-0.5 text-right font-semibold">
+                        金額
+                      </th>
+                      <th className="num py-0.5 text-right font-semibold">
+                        批發
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {col.map((row) => (
+                      <tr key={row.productId || row.name} className="border-b border-dashed">
+                        <td className="py-px pr-1">{row.name}</td>
+                        <td className="num py-px tabular-nums">
+                          {row.unitPrice == null
+                            ? Math.round(row.amount / Math.max(row.qty, 1))
+                            : Math.round(row.unitPrice)}
+                        </td>
+                        <td className="num py-px tabular-nums">{row.qty}</td>
+                        <td className="num py-px tabular-nums">
+                          {Math.round(row.amount)}
+                        </td>
+                        <td className="num py-px tabular-nums">
+                          {Math.round(row.costAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="py-0.5 font-semibold">合計</td>
+                      <td />
+                      <td className="num py-0.5 font-semibold tabular-nums">
+                        {colQty}
+                      </td>
+                      <td className="num py-0.5 font-semibold tabular-nums">
+                        {Math.round(colAmount)}
+                      </td>
+                      <td className="num py-0.5 font-semibold tabular-nums">
+                        {Math.round(colCost)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              );
+            })}
+          </div>
+        )}
+        <p className="mt-1 text-[12px] font-semibold tabular-nums print:text-[11px]">
+          總紀錄 · {soldRows.length}項 · {daySaleTotals.qty}件 · 金額{" "}
+          {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
+          {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
+        </p>
+      </section>
+      ) : null}
+
+      <section className="rp-sales rp-sale-tickets border-b px-3 py-2 md:px-4">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold">
             銷貨明細 · {periodLabel}
@@ -763,7 +856,7 @@ export function StockReportView() {
       {visibleDetails.length === 0 ? (
         <div
           className={cn(
-            "rp-sales px-6 py-8 text-center text-sm text-muted-foreground",
+            "rp-sales rp-sale-tickets px-6 py-8 text-center text-sm text-muted-foreground",
             printJob !== "dayCash" && "print:hidden",
           )}
         >
@@ -789,7 +882,7 @@ export function StockReportView() {
           ) : null}
         </div>
       ) : (
-        <div className="rp-sales divide-y border-b">
+        <div className="rp-sales rp-sale-tickets divide-y border-b">
           {saleTickets.map((ticket) => {
             const ymd = ymdParts(ticket.createdAt);
             return (

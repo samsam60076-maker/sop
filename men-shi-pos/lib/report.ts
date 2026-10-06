@@ -371,6 +371,54 @@ export function saleDetailTotals(lines: SaleDetailLine[]) {
   );
 }
 
+export type SoldProductRow = {
+  productId: string;
+  name: string;
+  unitPrice: number | null;
+  qty: number;
+  amount: number;
+  costAmount: number;
+};
+
+export function summarizeSoldProducts(lines: SaleDetailLine[]): SoldProductRow[] {
+  const map = new Map<
+    string,
+    SoldProductRow & { prices: Set<number> }
+  >();
+  for (const line of lines) {
+    const key = line.productId || line.name;
+    const current = map.get(key);
+    if (!current) {
+      map.set(key, {
+        productId: line.productId,
+        name: line.name,
+        unitPrice: line.unitPrice,
+        qty: line.qty,
+        amount: line.amount,
+        costAmount: line.costAmount,
+        prices: new Set([line.unitPrice]),
+      });
+      continue;
+    }
+    current.qty += line.qty;
+    current.amount += line.amount;
+    current.costAmount += line.costAmount;
+    current.prices.add(line.unitPrice);
+    current.unitPrice = current.prices.size === 1 ? line.unitPrice : null;
+  }
+  return [...map.values()]
+    .map(({ prices: _prices, ...row }) => row)
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
+}
+
+export function chunkSoldProducts<T>(list: T[], cols = 3): T[][] {
+  if (list.length === 0) return Array.from({ length: cols }, () => []);
+  const size = Math.ceil(list.length / cols);
+  return Array.from({ length: cols }, (_, index) =>
+    list.slice(index * size, index * size + size),
+  );
+}
+
 export type ReturnDetailLine = {
   returnId: string;
   number: string;

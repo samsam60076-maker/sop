@@ -141,6 +141,10 @@
     .report-print-day-cash .rp-expenses,
     .report-print-day-cash .rp-stock,
     .report-print-day-cash .rp-month-daily,
+    .report-print-day-cash .rp-sale-tickets,
+    .report-print-purchases .rp-day-sold,
+    .report-print-month-daily .rp-day-sold,
+    .report-print-all .rp-day-sold,
     .report-print-purchases .rp-sales,
     .report-print-purchases .rp-returns,
     .report-print-purchases .rp-expenses,
@@ -184,6 +188,34 @@
     }
     .stocktake-print .text-muted-foreground {
       color: #444 !important;
+    }
+    .rp-day-sold-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 3mm;
+      font-size: 10px;
+      line-height: 1.25;
+      color: #111;
+    }
+    .rp-day-sold-grid table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .rp-day-sold-grid th,
+    .rp-day-sold-grid td {
+      border-bottom: 1px solid #ccc;
+      padding: 1px 3px;
+      text-align: left;
+    }
+    .rp-day-sold-grid .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .rp-day-sold-grid tfoot td {
+      font-weight: 700;
+      border-top: 2px solid #111;
+      border-bottom: 0;
     }
   }
   body {
