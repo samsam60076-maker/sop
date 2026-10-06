@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Minus, Package, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProductTypeahead } from "@/components/product-typeahead";
 import { PurchasePastePanel } from "@/components/purchase-paste-panel";
@@ -368,84 +368,68 @@ export function PurchasesView() {
 
   const cartPanel = (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col lg:max-w-none">
-      <div className="flex items-center justify-between px-4 py-3">
-        <p className="text-base font-semibold">
+      <div className="flex items-center justify-between px-2 py-1">
+        <p className="text-[13px] font-semibold">
           {itemCount === 0 ? "本次進貨" : `本次進貨 · ${itemCount} 件`}
         </p>
-        {lines.length > 0 && (
+        {lines.length > 0 ? (
           <button
             type="button"
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => setLines([])}
           >
             清空
           </button>
-        )}
+        ) : null}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-1.5">
         {lines.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Package className="size-10 opacity-40" />
-            <p className="text-base font-medium">點左邊商品加入</p>
-          </div>
+          <p className="px-1 py-4 text-center text-[12px] text-muted-foreground">
+            點左邊商品，或貼文字加入
+          </p>
         ) : (
-          <ul className="divide-y">
+          <ul>
             {lines.map((line) => {
               const amount = Number(line.qty) || 0;
               const cost = Number(line.unitCost) || 0;
               return (
-                <li key={line.key} className="space-y-2 py-2.5">
-                  <div className="flex items-start gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-medium leading-snug">
-                        {line.name}
-                      </p>
-                      <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">
-                        批價 {twd(amount * cost)} · 售價 {twd(amount * line.price)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        className="flex size-10 items-center justify-center rounded-md border bg-background"
-                        onClick={() => setLineQty(line.key, amount - 1)}
-                        aria-label="減少"
-                      >
-                        <Minus className="size-4" />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={line.qty}
-                        onChange={(event) =>
-                          setLineQty(
-                            line.key,
-                            Number(event.target.value) || 0,
-                          )
-                        }
-                        className="h-10 w-12 rounded-md border bg-background text-center text-base tabular-nums"
-                        aria-label={`${line.name} 數量`}
-                      />
-                      <button
-                        type="button"
-                        className="flex size-10 items-center justify-center rounded-md border bg-background"
-                        onClick={() => setLineQty(line.key, amount + 1)}
-                        aria-label="增加"
-                      >
-                        <Plus className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="ml-0.5 flex size-10 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
-                        onClick={() => setLineQty(line.key, 0)}
-                        aria-label={`移除 ${line.name}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm text-muted-foreground">批價</span>
+                <li
+                  key={line.key}
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-1 border-b border-dashed py-0.5"
+                >
+                  <p className="truncate text-[12px] font-medium leading-tight">
+                    {line.name}
+                    <span className="ml-1 font-normal tabular-nums text-muted-foreground">
+                      {twd(amount * cost)}
+                    </span>
+                  </p>
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      className="flex size-6 items-center justify-center rounded border bg-background"
+                      onClick={() => setLineQty(line.key, amount - 1)}
+                      aria-label="減少"
+                    >
+                      <Minus className="size-3" />
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={line.qty}
+                      onChange={(event) =>
+                        setLineQty(line.key, Number(event.target.value) || 0)
+                      }
+                      className="h-6 w-8 rounded border bg-background text-center text-[12px] tabular-nums"
+                      aria-label={`${line.name} 數量`}
+                    />
+                    <button
+                      type="button"
+                      className="flex size-6 items-center justify-center rounded border bg-background"
+                      onClick={() => setLineQty(line.key, amount + 1)}
+                      aria-label="增加"
+                    >
+                      <Plus className="size-3" />
+                    </button>
                     <input
                       type="number"
                       min={0}
@@ -460,9 +444,18 @@ export function PurchasesView() {
                           ),
                         )
                       }
-                      className="h-8 w-16 rounded-md border bg-background px-1 text-center text-base tabular-nums"
+                      className="h-6 w-12 rounded border bg-background px-0.5 text-center text-[12px] tabular-nums"
                       aria-label={`${line.name} 批價`}
+                      title="批價"
                     />
+                    <button
+                      type="button"
+                      className="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-destructive"
+                      onClick={() => setLineQty(line.key, 0)}
+                      aria-label={`移除 ${line.name}`}
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
                   </div>
                 </li>
               );
@@ -470,33 +463,20 @@ export function PurchasesView() {
           </ul>
         )}
       </div>
-      <div className="border-t bg-card p-3">
-        <label className="mb-2 block">
-          <span className="sr-only">備註</span>
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="備註可留空"
-            className="mb-2 h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus-visible:border-ring"
-          />
-        </label>
-        <div className="mb-2 space-y-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm text-muted-foreground">進貨批價合計</span>
-            <span className="font-heading text-xl font-semibold tabular-nums">
-              {twd(draftTotal)}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm text-muted-foreground">售價合計</span>
-            <span className="font-heading text-xl font-semibold tabular-nums">
-              {twd(draftRetail)}
-            </span>
-          </div>
+      <div className="border-t bg-card px-2 py-1.5">
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="備註可留空"
+          className="mb-1 h-7 w-full rounded border bg-background px-1.5 text-[11px] outline-none focus-visible:border-ring"
+        />
+        <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px] tabular-nums">
+          <span className="text-muted-foreground">批價 {twd(draftTotal)}</span>
+          <span className="text-muted-foreground">售價 {twd(draftRetail)}</span>
         </div>
         <button
           type="button"
-          className="h-12 w-full rounded-lg bg-primary text-base font-medium text-primary-foreground disabled:opacity-50"
+          className="h-8 w-full rounded bg-primary text-[13px] font-medium text-primary-foreground disabled:opacity-50"
           disabled={lines.length === 0 && !picked && !query.trim()}
           onClick={submit}
         >
@@ -631,7 +611,7 @@ export function PurchasesView() {
         </div>
       </section>
 
-      <aside className="border-t bg-muted/70 lg:w-[26rem] lg:shrink-0 lg:border-t-0 lg:border-l lg:shadow-[-8px_0_24px_rgba(0,0,0,0.04)] xl:w-[28rem]">
+      <aside className="border-t bg-muted/70 lg:w-[20rem] lg:shrink-0 lg:border-t-0 lg:border-l xl:w-[21rem]">
         <div className="lg:sticky lg:top-9 lg:h-[calc(100svh-2.25rem)]">
           {cartPanel}
         </div>
@@ -643,7 +623,7 @@ export function PurchasesView() {
           shopName={storeName}
           day={purchaseDate}
           lines={paperLines}
-          defaultOpen
+          defaultOpen={false}
         />
       </div>
     </div>

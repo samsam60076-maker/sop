@@ -103,11 +103,11 @@ export function PurchasePastePanel({
         <textarea
           value={text}
           onChange={(event) => applyText(event.target.value)}
-          rows={6}
-          className="max-h-40 min-h-24 w-full resize-y rounded border bg-background px-1.5 py-1 text-[11px] leading-snug"
+          rows={3}
+          className="max-h-24 min-h-16 w-full resize-y rounded border bg-background px-1.5 py-1 text-[11px] leading-snug"
           placeholder={"香煎雞腿排20包\n國王白蝦14盒\n魷魚翅10包"}
         />
-        <div className="flex max-h-40 min-h-24 flex-col rounded border bg-background">
+        <div className="flex max-h-24 min-h-16 flex-col rounded border bg-background">
           <div className="flex items-center gap-1 border-b px-1.5 py-1">
             <p className="shrink-0 text-[11px] font-semibold">今天到貨明細</p>
             <input
