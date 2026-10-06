@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { OpenFullPageButton } from "@/components/open-full-page-button";
+import { StoreBar } from "@/components/store-bar";
 import { cn } from "@/lib/utils";
 import { todayLabel } from "@/lib/format";
 import { useStore } from "@/lib/store";
@@ -41,33 +42,12 @@ function TodayStamp() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { storeId, storeName, branches, switchStore } = useStore();
+  const { storeId, storeName } = useStore();
 
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b bg-sidebar text-sidebar-foreground">
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2 py-0.5">
-          <span className="shrink-0 text-[11px] text-sidebar-foreground/70">
-            總部
-          </span>
-          <div className="flex min-w-0 flex-wrap gap-0.5">
-            {branches.map((branch) => (
-              <button
-                key={branch.id}
-                type="button"
-                onClick={() => switchStore(branch.id)}
-                className={cn(
-                  "inline-flex h-6 items-center rounded px-1.5 text-xs",
-                  storeId === branch.id
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
-                )}
-              >
-                {branch.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        <StoreBar />
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2 pb-0.5">
           <Link href="/shop" className="shrink-0 text-xs font-semibold">
             {storeName}

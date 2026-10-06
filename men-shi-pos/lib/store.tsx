@@ -62,7 +62,9 @@ import {
 import {
   BRANCHES,
   branchName,
-  isBranchId,
+  listedBranches,
+  makeBranchId,
+  type Branch,
   type BranchId,
   type Workspace,
 } from "@/lib/branches";
@@ -89,9 +91,11 @@ type StoreContextValue = {
   ready: boolean;
   storeId: BranchId;
   storeName: string;
-  branches: typeof BRANCHES;
+  branches: Branch[];
   allStores: { id: BranchId; name: string; state: AppState }[];
   switchStore: (id: BranchId) => void;
+  addStore: (name: string) => { ok: true } | { ok: false; error: string };
+  removeStore: (id: BranchId) => { ok: true } | { ok: false; error: string };
   state: AppState;
   addProduct: (input: Parameters<typeof upsertProduct>[1]) =>
     { ok: true; product: Product } | { ok: false; error: string };
@@ -313,47 +317,98 @@ function emptyShop(name: string): AppState {
 }
 
 function emptyWorkspace(): Workspace {
-  const stores = {} as Record<BranchId, AppState>;
-  for (const branch of BRANCHES) {
+  const stores: Record<string, AppState> = {};
+  const branches = BRANCHES.map((branch) => ({
+    id: branch.id,
+    name: branch.name,
+  }));
+  for (const branch of branches) {
     stores[branch.id] = emptyShop(branch.name);
   }
-  return { version: 6, currentStoreId: "xiluo", stores };
+  return { version: 6, currentStoreId: "xiluo", stores, branches };
 }
 
 function workspaceHasWork(workspace: Workspace) {
-  return BRANCHES.some((branch) => hasShopWork(workspace.stores[branch.id]));
+  return listedBranches(workspace).some((branch) =>
+    hasShopWork(workspace.stores[branch.id]),
+  );
 }
 
 function workspaceScore(workspace: Workspace) {
-  return BRANCHES.reduce(
-    (sum, branch) => sum + workScore(workspace.stores[branch.id]),
+  return listedBranches(workspace).reduce(
+    (sum, branch) => sum + workScore(workspace.stores[branch.id] ?? emptyShop(branch.name)),
     0,
   );
 }
 
+function normalizeBranches(
+  parsed: Partial<Workspace> & { stores?: Record<string, unknown> },
+): Branch[] {
+  const out: Branch[] = [];
+  const seen = new Set<string>();
+  const push = (id: string, name: string) => {
+    const cleanId = id.trim();
+    const cleanName = name.trim();
+    if (!cleanId || seen.has(cleanId)) return;
+    seen.add(cleanId);
+    out.push({ id: cleanId, name: cleanName || cleanId });
+  };
+
+  if (Array.isArray(parsed.branches)) {
+    for (const item of parsed.branches) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as { id?: unknown; name?: unknown };
+      if (typeof row.id !== "string") continue;
+      push(row.id, typeof row.name === "string" ? row.name : row.id);
+    }
+  }
+
+  if (out.length === 0) {
+    for (const branch of BRANCHES) push(branch.id, branch.name);
+  }
+
+  if (parsed.stores && typeof parsed.stores === "object") {
+    for (const id of Object.keys(parsed.stores)) {
+      if (seen.has(id)) continue;
+      const slice = sanitizeState(parsed.stores[id]);
+      if (!slice) continue;
+      push(id, slice.settings.shopName?.trim() || id);
+    }
+  }
+
+  return out;
+}
+
 function sanitizeWorkspace(value: unknown): Workspace | null {
   if (!value || typeof value !== "object") return null;
-  const parsed = value as Partial<Workspace>;
+  const parsed = value as Partial<Workspace> & {
+    stores?: Record<string, unknown>;
+  };
   if (parsed.version !== 6 || !parsed.stores || typeof parsed.stores !== "object") {
     return null;
   }
-  const workspace = emptyWorkspace();
-  if (parsed.currentStoreId && isBranchId(parsed.currentStoreId)) {
-    workspace.currentStoreId = parsed.currentStoreId;
-  }
-  for (const branch of BRANCHES) {
+  const branches = normalizeBranches(parsed);
+  const stores: Record<string, AppState> = {};
+  for (const branch of branches) {
     const slice = sanitizeState(parsed.stores[branch.id]);
-    if (slice) {
-      workspace.stores[branch.id] = {
-        ...slice,
-        settings: normalizeSettings({
-          ...slice.settings,
-          shopName: slice.settings.shopName?.trim() || branch.name,
-        }),
-      };
-    }
+    stores[branch.id] = slice
+      ? {
+          ...slice,
+          settings: normalizeSettings({
+            ...slice.settings,
+            shopName: slice.settings.shopName?.trim() || branch.name,
+          }),
+        }
+      : emptyShop(branch.name);
   }
-  return workspace;
+  let currentStoreId = branches[0]?.id ?? "xiluo";
+  if (
+    typeof parsed.currentStoreId === "string" &&
+    stores[parsed.currentStoreId]
+  ) {
+    currentStoreId = parsed.currentStoreId;
+  }
+  return { version: 6, currentStoreId, stores, branches };
 }
 
 function parseWorkspace(raw: string | null): Workspace | null {
@@ -437,12 +492,15 @@ function readWorkspace(): Workspace {
 
 function read(): AppState {
   const workspace = readWorkspace();
-  return workspace.stores[workspace.currentStoreId];
+  return (
+    workspace.stores[workspace.currentStoreId] ??
+    emptyShop(branchName(workspace.currentStoreId, workspace))
+  );
 }
 
 function spreadCatalog(workspace: Workspace, source: AppState): Workspace {
   const stores = { ...workspace.stores };
-  for (const branch of BRANCHES) {
+  for (const branch of listedBranches(workspace)) {
     if (branch.id === workspace.currentStoreId) {
       stores[branch.id] = source;
       continue;
@@ -569,7 +627,7 @@ function parseCatalog(raw: string):
 
 function renameBinsEverywhere(workspace: Workspace, from: string, to: string): Workspace {
   const stores = { ...workspace.stores };
-  for (const branch of BRANCHES) {
+  for (const branch of listedBranches(workspace)) {
     const current = stores[branch.id];
     stores[branch.id] = {
       ...current,
@@ -588,11 +646,12 @@ function renameBinsEverywhere(workspace: Workspace, from: string, to: string): W
 }
 
 function unifySharedCatalog(workspace: Workspace): Workspace {
-  let richestId: BranchId = BRANCHES[0].id;
-  for (const branch of BRANCHES) {
+  const branches = listedBranches(workspace);
+  let richestId: BranchId = branches[0].id;
+  for (const branch of branches) {
     if (
-      workspace.stores[branch.id].products.length >
-      workspace.stores[richestId].products.length
+      (workspace.stores[branch.id]?.products.length ?? 0) >
+      (workspace.stores[richestId]?.products.length ?? 0)
     ) {
       richestId = branch.id;
     }
@@ -609,23 +668,23 @@ function unifySharedCatalog(workspace: Workspace): Workspace {
     }
   };
   addAll(workspace.stores[richestId].products);
-  for (const branch of BRANCHES) {
-    addAll(workspace.stores[branch.id].products);
+  for (const branch of branches) {
+    addAll(workspace.stores[branch.id]?.products ?? []);
   }
   const categories = mergeCategoryLists(
-    BRANCHES.map((branch) => workspace.stores[branch.id].settings.categories ?? []),
+    branches.map((branch) => workspace.stores[branch.id]?.settings.categories ?? []),
     catalog.map((item) => item.category),
   );
   const bins = uniqueCategories(
-    BRANCHES.flatMap((branch) => workspace.stores[branch.id].settings.bins ?? []),
+    branches.flatMap((branch) => workspace.stores[branch.id]?.settings.bins ?? []),
   );
   let systemId: BranchId = richestId;
   let systemScore = -1;
-  for (const branch of BRANCHES) {
-    const settings = workspace.stores[branch.id].settings;
+  for (const branch of branches) {
+    const settings = workspace.stores[branch.id]?.settings;
     const score =
-      (settings.bins?.length ?? 0) * 20 +
-      (settings.sop?.reduce((sum, item) => sum + item.body.length, 0) ?? 0);
+      (settings?.bins?.length ?? 0) * 20 +
+      (settings?.sop?.reduce((sum, item) => sum + item.body.length, 0) ?? 0);
     if (score > systemScore) {
       systemScore = score;
       systemId = branch.id;
@@ -680,6 +739,59 @@ function commitCatalog(next: AppState, options?: { force?: boolean }) {
   commitWorkspace(spreadCatalog(readWorkspace(), synced), options);
 }
 
+function addStore(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false as const, error: "請填門市名稱" };
+  const workspace = readWorkspace();
+  const branches = listedBranches(workspace);
+  if (branches.some((item) => item.name === trimmed)) {
+    return { ok: false as const, error: "已經有這間門市" };
+  }
+  if (branches.length >= 30) {
+    return { ok: false as const, error: "門市太多了" };
+  }
+  const id = makeBranchId(new Set(branches.map((item) => item.id)));
+  const source = workspace.stores[workspace.currentStoreId] ?? emptyShop(trimmed);
+  const next: Workspace = {
+    ...workspace,
+    currentStoreId: id,
+    branches: [...branches, { id, name: trimmed }],
+    stores: {
+      ...workspace.stores,
+      [id]: emptyShop(trimmed),
+    },
+  };
+  commitWorkspace(spreadCatalog(next, source), { force: true });
+  return { ok: true as const };
+}
+
+function removeStore(id: BranchId) {
+  const workspace = readWorkspace();
+  const branches = listedBranches(workspace);
+  if (branches.length <= 1) {
+    return { ok: false as const, error: "至少要留一間門市" };
+  }
+  if (!branches.some((item) => item.id === id)) {
+    return { ok: false as const, error: "找不到這間門市" };
+  }
+  const remaining = branches.filter((item) => item.id !== id);
+  const stores = { ...workspace.stores };
+  delete stores[id];
+  commitWorkspace(
+    {
+      ...workspace,
+      currentStoreId:
+        workspace.currentStoreId === id
+          ? remaining[0].id
+          : workspace.currentStoreId,
+      branches: remaining,
+      stores,
+    },
+    { force: true },
+  );
+  return { ok: true as const };
+}
+
 function getServerSnapshot() {
   return emptyState;
 }
@@ -691,18 +803,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       ready: true,
       storeId: readWorkspace().currentStoreId,
-      storeName: branchName(readWorkspace().currentStoreId),
-      branches: BRANCHES,
-      allStores: BRANCHES.map((branch) => ({
+      storeName:
+        read().settings.shopName?.trim() ||
+        branchName(readWorkspace().currentStoreId, readWorkspace()),
+      branches: listedBranches(readWorkspace()).map((branch) => ({
         id: branch.id,
-        name: branch.name,
-        state: readWorkspace().stores[branch.id],
+        name:
+          readWorkspace().stores[branch.id]?.settings.shopName?.trim() ||
+          branch.name,
+      })),
+      allStores: listedBranches(readWorkspace()).map((branch) => ({
+        id: branch.id,
+        name:
+          readWorkspace().stores[branch.id]?.settings.shopName?.trim() ||
+          branch.name,
+        state: readWorkspace().stores[branch.id] ?? emptyShop(branch.name),
       })),
       switchStore: (id) => {
         const workspace = readWorkspace();
         if (workspace.currentStoreId === id) return;
+        if (!workspace.stores[id]) return;
         commitWorkspace({ ...workspace, currentStoreId: id });
       },
+      addStore,
+      removeStore,
       state,
       addProduct: (input) => {
         const result = upsertProduct(read(), input);
