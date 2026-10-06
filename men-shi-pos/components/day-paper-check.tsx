@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { twd } from "@/lib/format";
 
 export type DayPaperLine = {
@@ -111,13 +111,36 @@ export function DayPaperCheck({
   shopName,
   day,
   lines,
+  defaultOpen = false,
 }: {
   kind: string;
   shopName: string;
   day: string;
   lines: DayPaperLine[];
+  defaultOpen?: boolean;
 }) {
+  const storageKey = `corner-pos-day-paper-${kind}`;
+  const [open, setOpen] = useState(defaultOpen);
   const [find, setFind] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw === "open") setOpen(true);
+      else if (raw === "hide") setOpen(false);
+    } catch {
+      /* ignore */
+    }
+  }, [storageKey]);
+
+  function setHidden(nextOpen: boolean) {
+    setOpen(nextOpen);
+    try {
+      window.localStorage.setItem(storageKey, nextOpen ? "open" : "hide");
+    } catch {
+      /* ignore */
+    }
+  }
   const showQty = lines.some((line) => line.qty != null);
   const shown = useMemo(() => {
     const q = find.trim().toLowerCase();
@@ -135,20 +158,32 @@ export function DayPaperCheck({
     0,
   );
   const pendingCount = shown.filter((line) => line.pending).length;
+  const summary = [
+    `${shown.length} 筆`,
+    showQty ? `${qtyTotal} 件` : "",
+    pendingCount > 0 ? `${pendingCount} 筆未入帳` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <section className="rounded-md border bg-card">
-      <div className="flex flex-wrap items-center gap-1.5 border-b px-2 py-1">
+      <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
         <h2 className="text-[13px] font-semibold">當日{kind}核對</h2>
         <span className="text-[11px] tabular-nums text-muted-foreground">
           {formatInputDay(day)}
+          {lines.length > 0 ? ` · ${summary}` : ""}
         </span>
-        <input
-          value={find}
-          onChange={(event) => setFind(event.target.value)}
-          placeholder={`找${kind}／對紙本`}
-          className="h-6 min-w-0 flex-1 rounded border bg-background px-1.5 text-[11px] sm:max-w-48"
-        />
+        <span className="ml-auto text-[11px] font-semibold tabular-nums">
+          {lines.length > 0 ? twd(amountTotal) : ""}
+        </span>
+        <button
+          type="button"
+          className="h-6 rounded border bg-background px-2 text-[11px]"
+          onClick={() => setHidden(!open)}
+        >
+          {open ? "隱藏" : "打開"}
+        </button>
         <button
           type="button"
           className="h-6 rounded border bg-background px-2 text-[11px]"
@@ -165,85 +200,95 @@ export function DayPaperCheck({
           預覽核對
         </button>
       </div>
-      {lines.length === 0 ? (
-        <p className="px-2 py-3 text-[12px] text-muted-foreground">
-          這天還沒打進{kind}。打進去後會列在這裡，方便對紙本。
-        </p>
-      ) : shown.length === 0 ? (
-        <p className="px-2 py-3 text-[12px] text-muted-foreground">
-          找不到「{find.trim()}」
-        </p>
-      ) : (
-        <ul className="max-h-48 overflow-y-auto px-1 py-0.5">
-          {shown.map((line) => {
-            const amount = line.refund ? -Math.abs(line.amount) : line.amount;
-            const row = (
-              <span className="grid min-w-0 flex-1 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-baseline gap-x-1 text-[11px] sm:grid-cols-[2.75rem_minmax(0,1fr)_2.25rem_auto]">
-                <span className="tabular-nums text-muted-foreground">
-                  {line.time || "—"}
-                </span>
-                <span className="min-w-0 truncate">
-                  {line.label}
-                  {line.hint ? (
-                    <span className="ml-1 text-muted-foreground">{line.hint}</span>
-                  ) : null}
-                  {line.pending ? (
-                    <span className="ml-1 text-amber-800">未入帳</span>
-                  ) : null}
-                  {line.refund ? (
-                    <span className="ml-1 text-destructive">退</span>
-                  ) : null}
-                </span>
-                {showQty ? (
-                  <span className="hidden text-right tabular-nums sm:block">
-                    {line.qty ?? ""}
+      {open ? (
+        <>
+          <div className="border-t px-2 py-1">
+            <input
+              value={find}
+              onChange={(event) => setFind(event.target.value)}
+              placeholder={`找${kind}／對紙本`}
+              className="h-6 w-full rounded border bg-background px-1.5 text-[11px] sm:max-w-48"
+            />
+          </div>
+          {lines.length === 0 ? (
+            <p className="px-2 py-3 text-[12px] text-muted-foreground">
+              這天還沒打進{kind}。打進去後會列在這裡，方便對紙本。
+            </p>
+          ) : shown.length === 0 ? (
+            <p className="px-2 py-3 text-[12px] text-muted-foreground">
+              找不到「{find.trim()}」
+            </p>
+          ) : (
+            <ul className="max-h-48 overflow-y-auto border-t px-1 py-0.5">
+              {shown.map((line) => {
+                const amount = line.refund
+                  ? -Math.abs(line.amount)
+                  : line.amount;
+                const row = (
+                  <span className="grid min-w-0 flex-1 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-baseline gap-x-1 text-[11px] sm:grid-cols-[2.75rem_minmax(0,1fr)_2.25rem_auto]">
+                    <span className="tabular-nums text-muted-foreground">
+                      {line.time || "—"}
+                    </span>
+                    <span className="min-w-0 truncate">
+                      {line.label}
+                      {line.hint ? (
+                        <span className="ml-1 text-muted-foreground">
+                          {line.hint}
+                        </span>
+                      ) : null}
+                      {line.pending ? (
+                        <span className="ml-1 text-amber-800">未入帳</span>
+                      ) : null}
+                      {line.refund ? (
+                        <span className="ml-1 text-destructive">退</span>
+                      ) : null}
+                    </span>
+                    {showQty ? (
+                      <span className="hidden text-right tabular-nums sm:block">
+                        {line.qty ?? ""}
+                      </span>
+                    ) : (
+                      <span className="hidden sm:block" />
+                    )}
+                    <span className="text-right font-medium tabular-nums">
+                      {twd(amount)}
+                    </span>
                   </span>
-                ) : (
-                  <span className="hidden sm:block" />
-                )}
-                <span className="text-right font-medium tabular-nums">
-                  {twd(amount)}
-                </span>
-              </span>
-            );
-            return (
-              <li
-                key={line.id}
-                className="flex items-center gap-1 border-b border-dashed last:border-b-0"
-              >
-                {line.onOpen ? (
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 px-1 py-0.5 text-left hover:bg-muted/60"
-                    onClick={line.onOpen}
+                );
+                return (
+                  <li
+                    key={line.id}
+                    className="flex items-center gap-1 border-b border-dashed last:border-b-0"
                   >
-                    {row}
-                  </button>
-                ) : (
-                  <div className="flex min-w-0 flex-1 px-1 py-0.5">{row}</div>
-                )}
-                {line.onDelete ? (
-                  <button
-                    type="button"
-                    className="shrink-0 px-1 text-[10px] text-destructive underline"
-                    onClick={line.onDelete}
-                  >
-                    刪除
-                  </button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-t px-2 py-1 text-[11px] tabular-nums">
-        <span className="text-muted-foreground">
-          {shown.length} 筆
-          {showQty ? ` · ${qtyTotal} 件` : ""}
-          {pendingCount > 0 ? ` · ${pendingCount} 筆未入帳` : ""}
-        </span>
-        <span className="font-semibold">合計 {twd(amountTotal)}</span>
-      </div>
+                    {line.onOpen ? (
+                      <button
+                        type="button"
+                        className="flex min-w-0 flex-1 px-1 py-0.5 text-left hover:bg-muted/60"
+                        onClick={line.onOpen}
+                      >
+                        {row}
+                      </button>
+                    ) : (
+                      <div className="flex min-w-0 flex-1 px-1 py-0.5">
+                        {row}
+                      </div>
+                    )}
+                    {line.onDelete ? (
+                      <button
+                        type="button"
+                        className="shrink-0 px-1 text-[10px] text-destructive underline"
+                        onClick={line.onDelete}
+                      >
+                        刪除
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      ) : null}
     </section>
   );
 }

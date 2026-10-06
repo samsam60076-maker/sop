@@ -643,6 +643,7 @@ export function PurchasesView() {
           shopName={storeName}
           day={purchaseDate}
           lines={paperLines}
+          defaultOpen
         />
       </div>
     </div>

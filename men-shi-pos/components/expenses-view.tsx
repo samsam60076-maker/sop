@@ -202,6 +202,7 @@ export function ExpensesView() {
           shopName={storeName}
           day={day}
           lines={paperLines}
+          defaultOpen
         />
       </div>
 
