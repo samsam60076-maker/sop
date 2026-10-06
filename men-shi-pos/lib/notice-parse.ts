@@ -17,6 +17,7 @@ function toHalfWidthDigits(text: string) {
 
 function clean(text: string) {
   return toHalfWidthDigits(text)
+    .replace(/[\u200B-\u200D\uFEFF\u2060]/g, "")
     .replace(/\u00a0/g, " ")
     .replace(/[：﹕︰︓∶]/g, ":")
     .replace(/[★☆＊*✦✧✨●■]+/g, " ")
@@ -26,13 +27,38 @@ function clean(text: string) {
 }
 
 const NAME_RE =
-  /(?:到貨商品|商品名稱|品名|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?))\s*:?\s*(.+)$/i;
+  /(?:到貨商品|到货商品|商品名稱|商品名称|品名|arrived?\s+(?:goods|products?|merchandise)|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?)|goods\s+(?:arrived|received)|product(?:s)?\s*name)\s*:?\s*(.*)$/i;
 const PRICE_RE =
-  /(?:單價|金額|售價|價錢|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)/i;
+  /(?:單價|单价|金額|金额|售價|售价|價錢|价钱|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)/i;
 const QTY_RE =
-  /(?:數量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
+  /(?:數量|数量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
 const INLINE_RE =
-  /(?:到貨商品|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?))\s*:?\s*(.+?)\s+(?:單價|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)\s+(?:數量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
+  /(?:到貨商品|到货商品|arrival(?:\s+of)?\s+(?:goods|products?|merchandise)|incoming\s+(?:goods|products?))\s*:?\s*(.+?)\s+(?:單價|单价|unit\s*price|price)\s*[:,，,]?\s*[\$＄]?\s*(\d+)\s+(?:數量|数量|qty|quantity)\s*[:,，,]?\s*[+＋]?\s*(\d+)/i;
+
+function isQtyLabel(line: string) {
+  return /(?:數量|数量|qty|quantity)/i.test(line);
+}
+
+function isPriceLabel(line: string) {
+  return /(?:單價|单价|金額|金额|售價|售价|價錢|价钱|unit\s*price)/i.test(line);
+}
+
+function nameFromLine(line: string) {
+  const named = line.match(NAME_RE);
+  const fromLabel = named?.[1]?.replace(/(?:單價|单价|unit\s*price|price).*$/i, "").trim();
+  if (fromLabel) return fromLabel;
+  if (isQtyLabel(line) || isPriceLabel(line)) return "";
+  const stripped = line
+    .replace(/^(?:到貨商品|到货商品|商品名稱|商品名称|品名)\s*:?\s*/i, "")
+    .trim();
+  const cjkStart = stripped.search(/[\u4e00-\u9fff]/);
+  const cjk = (stripped.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (cjk >= 2) {
+    return (cjkStart > 0 ? stripped.slice(cjkStart) : stripped).trim();
+  }
+  if (stripped.length >= 4 && /[a-z]/i.test(stripped)) return stripped;
+  return "";
+}
 
 function compact(text: string) {
   return text.replace(/[\s★☆＊*·・\-_/]/g, "").toLowerCase();
@@ -147,6 +173,30 @@ export function parseArrivalNotice(
   }
   if (items.length > 0) return items;
 
+  for (let index = 0; index < lines.length; index += 1) {
+    const qty = lines[index].match(QTY_RE);
+    if (!qty) continue;
+    let foundName = "";
+    let foundPrice = 0;
+    for (let back = index - 1; back >= 0; back -= 1) {
+      if (QTY_RE.test(lines[back]) && foundName) break;
+      const priced = lines[back].match(PRICE_RE);
+      if (priced && foundPrice === 0) {
+        foundPrice = Number(priced[1]);
+        continue;
+      }
+      const label = nameFromLine(lines[back]);
+      if (label) {
+        foundName = label;
+        break;
+      }
+    }
+    if (foundName) {
+      pushItem(items, products, foundName, Number(qty[1]), foundPrice);
+    }
+  }
+  if (items.length > 0) return items;
+
   const text = lines.join("\n");
   const block = new RegExp(INLINE_RE.source, "gi");
   for (const match of text.matchAll(block)) {
@@ -160,3 +210,56 @@ export function parseArrivalNotice(
   }
   return items;
 }
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseCatalogPurchase(raw: string, products: Product[]): NoticeItem[] {
+  const catalog = [...products].sort((a, b) => b.name.length - a.name.length);
+  let text = toHalfWidthDigits(raw).replace(/[＋]/g, "+");
+  const items: NoticeItem[] = [];
+  for (const product of catalog) {
+    const namedStar = new RegExp(
+      `${escapeRegExp(product.name)}\\s*[*xX×]\\s*(\\d+)(?:\\s*[\\$＄]?\\s*(\\d+))?`,
+      "gi",
+    );
+    text = text.replace(namedStar, (_all, qty: string, price?: string) => {
+      pushItem(items, products, product.name, Number(qty), Number(price || 0));
+      return " ";
+    });
+    const namedQty = new RegExp(
+      `${escapeRegExp(product.name)}\\s+(\\d+)(?:\\s+[\\$＄]?\\s*(\\d+))?`,
+      "gi",
+    );
+    text = text.replace(namedQty, (_all, qty: string, price?: string) => {
+      pushItem(items, products, product.name, Number(qty), Number(price || 0));
+      return " ";
+    });
+  }
+  const leftover = text
+    .split(/[,，、\n;；]+/)
+    .map((part) => clean(part))
+    .filter(Boolean);
+  for (const part of leftover) {
+    if (/^(品名|商品|數量|数量|單價|单价|批價|售價|合計|備註)/.test(part) && part.length < 12) {
+      continue;
+    }
+    if (/^\d+$/.test(part) || part.length < 2) continue;
+    const star = part.match(/^(.+?)\s+(\d+)$/);
+    const label = star ? star[1] : part;
+    const qty = star ? Number(star[2]) : 1;
+    const probe: NoticeItem[] = [];
+    pushItem(probe, products, label, qty, 0);
+    if (probe[0]?.productId) items.push(probe[0]);
+  }
+  return items;
+}
+
+/** 貼上進貨文字：到貨訊息、茶葉蛋*10、白蝦 5 120，拆成商品、數量、批價。 */
+export function parsePurchasePaste(raw: string, products: Product[]): NoticeItem[] {
+  const notice = parseArrivalNotice(raw, products);
+  if (notice.length > 0) return notice;
+  return parseCatalogPurchase(raw, products);
+}
+

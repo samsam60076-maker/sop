@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { Minus, Package, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProductTypeahead } from "@/components/product-typeahead";
+import { PurchasePastePanel } from "@/components/purchase-paste-panel";
 import {
   Table,
   TableBody,
@@ -69,6 +70,14 @@ export function PurchasesView() {
         const amount = Number(line.qty) || 0;
         const cost = Number(line.unitCost) || 0;
         return sum + amount * cost;
+      }, 0),
+    [lines],
+  );
+  const draftRetail = useMemo(
+    () =>
+      lines.reduce((sum, line) => {
+        const amount = Number(line.qty) || 0;
+        return sum + amount * (Number(line.price) || 0);
       }, 0),
     [lines],
   );
@@ -383,7 +392,7 @@ export function PurchasesView() {
                         {line.name}
                       </p>
                       <p className="mt-0.5 text-sm tabular-nums text-muted-foreground">
-                        小計 {twd(amount * cost)} · 售價 {twd(line.price)}
+                        批價 {twd(amount * cost)} · 售價 {twd(amount * line.price)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
@@ -462,11 +471,19 @@ export function PurchasesView() {
             className="mb-2 h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus-visible:border-ring"
           />
         </label>
-        <div className="mb-2 flex items-baseline justify-between gap-3">
-          <span className="text-sm text-muted-foreground">進貨批價合計</span>
-          <span className="font-heading text-2xl font-semibold tabular-nums">
-            {twd(draftTotal)}
-          </span>
+        <div className="mb-2 space-y-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm text-muted-foreground">進貨批價合計</span>
+            <span className="font-heading text-xl font-semibold tabular-nums">
+              {twd(draftTotal)}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm text-muted-foreground">售價合計</span>
+            <span className="font-heading text-xl font-semibold tabular-nums">
+              {twd(draftRetail)}
+            </span>
+          </div>
         </div>
         <button
           type="button"
@@ -485,23 +502,23 @@ export function PurchasesView() {
     <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
       <section className="min-w-0 flex-1">
         <div className="border-b bg-card px-3 py-2">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">進貨年月日</span>
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">進貨年月日</span>
             <YmdPicker
-              compact
+              tiny
               id="purchase-date"
               value={purchaseDate}
               onChange={setPurchaseDate}
             />
           </div>
-          <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5">
+          <div className="mb-1.5 flex gap-1 overflow-x-auto pb-0.5">
             {["全部", ...categories].map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-sm whitespace-nowrap",
+                  "rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
                   category === item
                     ? "border-primary bg-primary text-primary-foreground"
                     : "bg-background text-muted-foreground hover:bg-muted",
@@ -542,6 +559,20 @@ export function PurchasesView() {
               加入
             </button>
           </form>
+          <PurchasePastePanel
+            products={activeProducts}
+            onAdd={(items) => {
+              for (const item of items) {
+                const product = activeProducts.find(
+                  (row) => row.id === item.productId,
+                );
+                if (!product) continue;
+                const cost =
+                  item.unitPrice > 0 ? item.unitPrice : product.cost;
+                pushLine(product, item.qty, cost, product.price);
+              }
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
