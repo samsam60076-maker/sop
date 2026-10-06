@@ -19,6 +19,7 @@ import {
   toggleId,
 } from "@/components/record-pick";
 import { YmdPicker } from "@/components/ymd-picker";
+import { DayPaperCheck, type DayPaperLine } from "@/components/day-paper-check";
 import {
   formatTime,
   inputDateToIso,
@@ -34,7 +35,7 @@ const fieldClass =
   "h-8 min-w-0 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";
 
 export function ExpensesView() {
-  const { state, addExpense, removeExpense, removeExpenses } = useStore();
+  const { state, storeName, addExpense, removeExpense, removeExpenses } = useStore();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [day, setDay] = useState(toInputDate);
   const [title, setTitle] = useState("");
@@ -51,6 +52,18 @@ export function ExpensesView() {
   );
   const monthTotal = expenseTotals(monthLines);
   const dayTotal = expenseTotals(dayLines);
+  const paperLines = useMemo<DayPaperLine[]>(
+    () =>
+      dayLines.map((item) => ({
+        id: item.id,
+        time: formatTime(item.createdAt),
+        label: item.title,
+        hint: item.note || item.number,
+        amount: item.amount,
+        onDelete: () => deleteOneExpense(item.id, item.title),
+      })),
+    [dayLines],
+  );
   const [year, month, date] = day.split("-").map(Number);
 
   function submit(event: React.FormEvent) {
@@ -181,6 +194,15 @@ export function ExpensesView() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="px-3 py-2 md:px-4">
+        <DayPaperCheck
+          kind="支出"
+          shopName={storeName}
+          day={day}
+          lines={paperLines}
+        />
       </div>
 
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-1.5 md:px-4">

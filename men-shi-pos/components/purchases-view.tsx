@@ -5,14 +5,7 @@ import { Minus, Package, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProductTypeahead } from "@/components/product-typeahead";
 import { PurchasePastePanel } from "@/components/purchase-paste-panel";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DayPaperCheck, type DayPaperLine } from "@/components/day-paper-check";
 import { YmdPicker } from "@/components/ymd-picker";
 import { formatTime, inputDateToIso, toInputDate, twd } from "@/lib/format";
 import Link from "next/link";
@@ -33,7 +26,7 @@ type DraftLine = {
 };
 
 export function PurchasesView() {
-  const { state, receiveStock, removePurchase } = useStore();
+  const { state, storeName, receiveStock, removePurchase } = useStore();
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(toInputDate());
   const [query, setQuery] = useState("");
@@ -110,11 +103,27 @@ export function PurchasesView() {
       ),
     [dayPurchases],
   );
-  const dayQty = dayLines.reduce((sum, line) => sum + line.qty, 0);
-  const dayCost = dayPurchases.reduce(
-    (sum, purchase) => sum + purchase.totalCost,
-    0,
-  );
+  const paperLines = useMemo<DayPaperLine[]>(() => {
+    const pending: DayPaperLine[] = lines.map((line) => ({
+      id: `draft-${line.key}`,
+      time: "",
+      label: line.name,
+      hint: "本次進貨",
+      qty: Number(line.qty) || 0,
+      amount: (Number(line.qty) || 0) * (Number(line.unitCost) || 0),
+      pending: true,
+    }));
+    const posted: DayPaperLine[] = dayLines.map((line) => ({
+      id: line.key,
+      time: formatTime(line.createdAt),
+      label: line.name,
+      hint: line.number,
+      qty: line.qty,
+      amount: line.amount,
+      onDelete: () => deleteOnePurchase(line.purchaseId, line.number),
+    }));
+    return [...pending, ...posted];
+  }, [lines, dayLines]);
 
   function focusName() {
     window.setTimeout(() => nameRef.current?.focus(), 0);
@@ -541,7 +550,7 @@ export function PurchasesView() {
               activeOnly
               compact
               showCost
-              placeholder="打名稱找商品，例如 茶葉蛋*10"
+              placeholder="打名稱找商品，例如 香煎雞腿排"
             />
             <input
               ref={qtyRef}
@@ -561,6 +570,7 @@ export function PurchasesView() {
           </form>
           <PurchasePastePanel
             products={activeProducts}
+            inCartIds={lines.map((line) => line.productId)}
             onAdd={(items) => {
               for (const item of items) {
                 const product = activeProducts.find(
@@ -627,76 +637,14 @@ export function PurchasesView() {
         </div>
       </aside>
     </div>
-      <section className="border-t">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2 md:px-4">
-          <h2 className="text-sm font-semibold">當日進貨明細</h2>
-          <p className="text-sm tabular-nums text-muted-foreground">
-            {dayPurchases.length} 張 · {dayQty} 件 · 批價合計 {twd(dayCost)}
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          {dayLines.length === 0 ? (
-            <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-              這天還沒有進貨
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-8">時間</TableHead>
-                  <TableHead className="h-8">單號</TableHead>
-                  <TableHead className="h-8">商品名稱</TableHead>
-                  <TableHead className="h-8 text-right">數量</TableHead>
-                  <TableHead className="h-8 text-right">售價</TableHead>
-                  <TableHead className="h-8 text-right">批價</TableHead>
-                  <TableHead className="h-8 text-right">小計</TableHead>
-                  <TableHead className="h-8">備註</TableHead>
-                  <TableHead className="h-8 w-12 text-right">刪除</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dayLines.map((line) => (
-                  <TableRow key={line.key}>
-                    <TableCell className="py-1.5 text-sm text-muted-foreground">
-                      {formatTime(line.createdAt)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-sm">{line.number}</TableCell>
-                    <TableCell className="py-1.5 text-base font-medium">
-                      {line.name}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-base font-semibold tabular-nums">
-                      {line.qty}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right tabular-nums">
-                      {twd(line.unitPrice)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right tabular-nums">
-                      {twd(line.unitCost)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right text-base font-semibold tabular-nums">
-                      {twd(line.amount)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-sm">
-                      {line.note || "—"}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-right">
-                      <button
-                        type="button"
-                        className="text-xs text-destructive underline"
-                        onClick={() =>
-                          deleteOnePurchase(line.purchaseId, line.number)
-                        }
-                      >
-                        刪除
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      </section>
+      <div className="border-t px-3 py-2 md:px-4">
+        <DayPaperCheck
+          kind="進貨"
+          shopName={storeName}
+          day={purchaseDate}
+          lines={paperLines}
+        />
+      </div>
     </div>
   );
 }

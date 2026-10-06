@@ -42,6 +42,7 @@ import {
 } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { NoticeSplitPanel } from "@/components/notice-split-panel";
+import { DayPaperCheck, type DayPaperLine } from "@/components/day-paper-check";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_NOTE = "正常販售";
@@ -112,6 +113,7 @@ function writeCheckoutOrder(storeId: string, ids: string[]) {
 export function CheckoutView() {
   const {
     storeId,
+    storeName,
     state,
     checkout,
     refundCash,
@@ -141,7 +143,6 @@ export function CheckoutView() {
   );
   const staffBuy = staffBuyMode !== "off";
   const [arrange, setArrange] = useState(false);
-  const [dayLogOpen, setDayLogOpen] = useState(false);
   const [saleBarOpen, setSaleBarOpen] = useState(false);
   const [checkoutOrder, setCheckoutOrderState] = useState<string[]>([]);
 
@@ -219,7 +220,53 @@ export function CheckoutView() {
       ),
     [state.sales, saleDate],
   );
-  const dayRefundTotal = dayRefunds.reduce((sum, item) => sum + item.total, 0);
+  const paperLines = useMemo<DayPaperLine[]>(() => {
+    const pending: DayPaperLine[] = lines.map((line) => ({
+      id: `cart-${line.id}`,
+      time: "",
+      label: line.product.name,
+      hint: "購物車",
+      qty: line.qty,
+      amount: line.amount,
+      pending: true,
+    }));
+    const sold: DayPaperLine[] = daySales.flatMap((sale) =>
+      sale.items.map((item, index) => ({
+        id: `${sale.id}-${index}`,
+        time: formatTime(sale.createdAt),
+        label: item.name,
+        hint: sale.number,
+        qty: item.qty,
+        amount: lineAmount(item),
+        onOpen: () => setOpenSale(sale),
+      })),
+    );
+    const refunded: DayPaperLine[] = dayRefunds.flatMap((refund) =>
+      refund.items.length > 0
+        ? refund.items.map((item, index) => ({
+            id: `${refund.id}-${index}`,
+            time: formatTime(refund.createdAt),
+            label: item.name,
+            hint: refund.number,
+            qty: item.qty,
+            amount: lineAmount(item),
+            refund: true,
+            onOpen: () => setOpenRefund(refund),
+          }))
+        : [
+            {
+              id: refund.id,
+              time: formatTime(refund.createdAt),
+              label: "退費",
+              hint: refund.number,
+              amount: refund.total,
+              refund: true,
+              onOpen: () => setOpenRefund(refund),
+            },
+          ],
+    );
+    return [...pending, ...sold, ...refunded];
+  }, [lines, daySales, dayRefunds]);
 
   function cartQtyOf(current: CartLine[], productId: string) {
     return current
@@ -1018,79 +1065,14 @@ export function CheckoutView() {
               加入
             </Button>
           </form>
-          {daySales.length > 0 || dayRefunds.length > 0 ? (
-            <div className="mt-2 rounded-md border bg-background px-2 py-1">
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 text-left text-[11px] text-muted-foreground"
-                onClick={() => setDayLogOpen((current) => !current)}
-              >
-                <span>
-                  本日已入帳 {daySales.length + dayRefunds.length} 筆
-                  {dayRefundTotal > 0 ? ` · 退費 ${twd(dayRefundTotal)}` : ""}
-                </span>
-                <span>{dayLogOpen ? "收起" : "打開看"}</span>
-              </button>
-              {dayLogOpen ? (
-              <div className="mt-1 max-h-36 space-y-0.5 overflow-y-auto">
-              {daySales.map((sale) => (
-                <div
-                  key={sale.id}
-                  className="flex items-center justify-between gap-2 text-xs"
-                >
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-baseline gap-1 rounded px-0.5 py-0.5 text-left hover:bg-muted"
-                    onClick={() => setOpenSale(sale)}
-                  >
-                    <span className="min-w-0 truncate">
-                      {formatTime(sale.createdAt)} {sale.number}{" "}
-                      {sale.items[0]?.name ?? "銷貨"}
-                      {sale.items.length > 1
-                        ? ` 等${sale.items.length}項`
-                        : ""}{" "}
-                      {twd(sale.total)}
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">明細</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="shrink-0 text-destructive underline"
-                    onClick={() => deleteDaySale(sale.id, sale.number)}
-                  >
-                    刪除
-                  </button>
-                </div>
-              ))}
-              {dayRefunds.map((refund) => (
-                <div
-                  key={refund.id}
-                  className="flex items-center justify-between gap-2 text-xs"
-                >
-                  <button
-                    type="button"
-                    className="flex min-w-0 flex-1 items-baseline gap-1 rounded px-0.5 py-0.5 text-left hover:bg-muted"
-                    onClick={() => setOpenRefund(refund)}
-                  >
-                    <span className="min-w-0 truncate">
-                      {formatTime(refund.createdAt)} {refund.number} 退費{" "}
-                      {twd(refund.total)}
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">明細</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="shrink-0 text-destructive underline"
-                    onClick={() => deleteDayRefund(refund.id, refund.number)}
-                  >
-                    刪除
-                  </button>
-                </div>
-              ))}
-              </div>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="mt-2">
+            <DayPaperCheck
+              kind="收銀"
+              shopName={storeName}
+              day={saleDate}
+              lines={paperLines}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-1.5 p-2 sm:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
