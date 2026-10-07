@@ -1363,6 +1363,7 @@ function sortStocktakeProducts(products: Product[]) {
 
 function sameStocktakeLine(left: StocktakeLine, right: StocktakeLine) {
   return (
+    left.id === right.id &&
     left.productId === right.productId &&
     left.name === right.name &&
     left.sku === right.sku &&
@@ -1372,56 +1373,60 @@ function sameStocktakeLine(left: StocktakeLine, right: StocktakeLine) {
     left.bookQty === right.bookQty &&
     left.countedQty === right.countedQty &&
     left.unitPrice === right.unitPrice &&
-    left.unitCost === right.unitCost
+    left.unitCost === right.unitCost &&
+    left.countedOn === right.countedOn
   );
+}
+
+export function stocktakeLineKey(line: StocktakeLine) {
+  return line.id || line.productId;
+}
+
+function matchStocktakeProduct(name: string, products: Product[]) {
+  const q = name.trim().toLowerCase();
+  if (!q) return null;
+  const usable = products.filter((item) => !isCombo(item));
+  const exact = usable.filter((item) => item.name.toLowerCase() === q);
+  if (exact.length === 1) return exact[0];
+  const start = usable.filter((item) => item.name.toLowerCase().startsWith(q));
+  if (start.length === 1) return start[0];
+  return null;
 }
 
 export function linesForStocktake(
   products: Product[],
   existing: StocktakeLine[] = [],
 ): StocktakeLine[] {
-  const previous = new Map(existing.map((line) => [line.productId, line]));
-  const catalogIds = new Set(products.map((product) => product.id));
-  const lines = sortStocktakeProducts(
-    products.filter((product) => !isCombo(product)),
-  ).map((product) => {
-    const current = previous.get(product.id);
-    if (current) {
+  return existing
+    .filter(
+      (line) =>
+        Boolean(line.bin?.trim()) ||
+        line.countedQty != null ||
+        Boolean(line.id && line.name.trim()),
+    )
+    .map((line) => {
+      const product = products.find((item) => item.id === line.productId);
+      if (!product) {
+        return {
+          ...line,
+          id: stocktakeLineKey(line) || crypto.randomUUID(),
+          bin: line.bin ?? "",
+          unitPrice: line.unitPrice ?? 0,
+          unitCost: line.unitCost ?? 0,
+        };
+      }
       return {
-        ...current,
-        name: product.name,
+        ...line,
+        id: line.id || product.id,
+        name: line.name || product.name,
         sku: product.sku,
         category: product.category,
-        bin: current.bin ?? "",
-        unit: product.unit,
-        unitPrice: product.price,
-        unitCost: product.cost,
-      };
-    }
-    return {
-      productId: product.id,
-      name: product.name,
-      sku: product.sku,
-      category: product.category,
-      bin: "",
-      unit: product.unit,
-      bookQty: product.stock,
-      countedQty: null,
-      unitPrice: product.price,
-      unitCost: product.cost,
-    };
-  });
-  for (const line of existing) {
-    if (!catalogIds.has(line.productId) && line.countedQty != null) {
-      lines.push({
-        ...line,
         bin: line.bin ?? "",
-        unitPrice: line.unitPrice ?? 0,
-        unitCost: line.unitCost ?? 0,
-      });
-    }
-  }
-  return lines;
+        unit: product.unit,
+        unitPrice: line.unitPrice ?? product.price,
+        unitCost: line.unitCost ?? product.cost,
+      };
+    });
 }
 
 export function syncDraftStocktakes(state: AppState): AppState {
@@ -1481,9 +1486,6 @@ export function startStocktake(
   state: AppState,
   input: { title?: string; note?: string; countedAt?: string } = {},
 ): EngineResult<Stocktake> {
-  const lines = linesForStocktake(state.products);
-  if (lines.length === 0) return { ok: false, error: "沒有可盤點的商品" };
-
   const countedAt = input.countedAt ?? nowIso();
   const title = input.title?.trim() || monthStocktakeTitle(new Date(countedAt));
   const stocktake: Stocktake = {
@@ -1497,7 +1499,7 @@ export function startStocktake(
     countedAt,
     note: input.note?.trim() || "",
     status: "draft",
-    lines,
+    lines: [],
   };
 
   return {
@@ -1519,10 +1521,14 @@ export function saveStocktakeCounts(
   if (current.status !== "draft") return { ok: false, error: "此單已入帳，不能再改" };
 
   const lines = current.lines.map((line) => {
-    if (!Object.prototype.hasOwnProperty.call(input.counts, line.productId)) {
+    const key = stocktakeLineKey(line);
+    if (
+      !Object.prototype.hasOwnProperty.call(input.counts, key) &&
+      !Object.prototype.hasOwnProperty.call(input.counts, line.productId)
+    ) {
       return line;
     }
-    const raw = input.counts[line.productId];
+    const raw = input.counts[key] ?? input.counts[line.productId];
     if (raw == null) return { ...line, countedQty: null };
     if (!Number.isFinite(raw) || raw < 0) return line;
     return { ...line, countedQty: Math.round(raw) };
@@ -1555,12 +1561,126 @@ export function saveStocktakeBins(
   if (current.status !== "draft") return { ok: false, error: "此單已入帳，不能再改" };
 
   const lines = current.lines.map((line) => {
-    if (!Object.prototype.hasOwnProperty.call(input.bins, line.productId)) {
+    const key = stocktakeLineKey(line);
+    if (
+      !Object.prototype.hasOwnProperty.call(input.bins, key) &&
+      !Object.prototype.hasOwnProperty.call(input.bins, line.productId)
+    ) {
       return line;
     }
-    return { ...line, bin: input.bins[line.productId].trim() };
+    const bin = input.bins[key] ?? input.bins[line.productId];
+    return { ...line, bin: bin.trim() };
   });
 
+  const stocktake: Stocktake = { ...current, lines };
+  return {
+    ok: true,
+    data: stocktake,
+    state: {
+      ...state,
+      stocktakes: (state.stocktakes ?? []).map((item) =>
+        item.id === stocktake.id ? stocktake : item,
+      ),
+    },
+  };
+}
+
+export function upsertStocktakeLine(
+  state: AppState,
+  input: {
+    id: string;
+    lineId?: string;
+    bin: string;
+    name: string;
+    countedOn?: string;
+    countedQty?: number | null;
+    unitPrice?: number;
+  },
+): EngineResult<Stocktake> {
+  const current = (state.stocktakes ?? []).find((item) => item.id === input.id);
+  if (!current) return { ok: false, error: "找不到盤點單" };
+  if (current.status !== "draft") return { ok: false, error: "此單已入帳，不能再改" };
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "請填商品名稱" };
+  const bin = input.bin.trim();
+  if (!bin) return { ok: false, error: "請先選櫃子" };
+
+  const qty = input.countedQty;
+  if (qty != null && (!Number.isFinite(qty) || qty < 0)) {
+    return { ok: false, error: "數量不對" };
+  }
+  const price =
+    input.unitPrice == null || !Number.isFinite(input.unitPrice)
+      ? undefined
+      : Math.max(0, Math.round(input.unitPrice));
+  const product = matchStocktakeProduct(name, state.products);
+  const countedOn = input.countedOn?.trim() || undefined;
+
+  let found = false;
+  const lines = current.lines.map((line) => {
+    if (stocktakeLineKey(line) !== input.lineId) return line;
+    found = true;
+    return {
+      ...line,
+      name: product?.name ?? name,
+      productId: product?.id ?? line.productId,
+      sku: product?.sku ?? line.sku,
+      category: product?.category ?? line.category,
+      unit: product?.unit ?? line.unit,
+      bin,
+      bookQty: product?.stock ?? line.bookQty,
+      countedQty: qty === undefined ? line.countedQty : qty,
+      unitPrice: price ?? product?.price ?? line.unitPrice,
+      unitCost: product?.cost ?? line.unitCost,
+      countedOn: countedOn ?? line.countedOn,
+    };
+  });
+
+  if (!found) {
+    lines.push({
+      id: crypto.randomUUID(),
+      productId: product?.id ?? "",
+      name: product?.name ?? name,
+      sku: product?.sku ?? "",
+      category: product?.category ?? "",
+      bin,
+      unit: product?.unit ?? "個",
+      bookQty: product?.stock ?? 0,
+      countedQty: qty ?? null,
+      unitPrice: price ?? product?.price ?? 0,
+      unitCost: product?.cost ?? 0,
+      countedOn,
+    });
+  }
+
+  const stocktake: Stocktake = { ...current, lines };
+  return {
+    ok: true,
+    data: stocktake,
+    state: {
+      ...state,
+      stocktakes: (state.stocktakes ?? []).map((item) =>
+        item.id === stocktake.id ? stocktake : item,
+      ),
+    },
+  };
+}
+
+export function removeStocktakeLine(
+  state: AppState,
+  input: { id: string; lineId: string },
+): EngineResult<Stocktake> {
+  const current = (state.stocktakes ?? []).find((item) => item.id === input.id);
+  if (!current) return { ok: false, error: "找不到盤點單" };
+  if (current.status !== "draft") return { ok: false, error: "此單已入帳，不能再改" };
+
+  const lines = current.lines.filter(
+    (line) => stocktakeLineKey(line) !== input.lineId,
+  );
+  if (lines.length === current.lines.length) {
+    return { ok: false, error: "找不到這一列" };
+  }
   const stocktake: Stocktake = { ...current, lines };
   return {
     ok: true,
@@ -1620,11 +1740,12 @@ export function confirmStocktake(
 
   const counted = current.lines.filter((line) => line.countedQty != null);
   if (counted.length === 0) {
-    return { ok: false, error: "請先填實盤數量" };
+    return { ok: false, error: "請先填數量" };
   }
 
   let next = state;
   for (const line of counted) {
+    if (!state.products.some((item) => item.id === line.productId)) continue;
     const result = adjustStock(next, {
       productId: line.productId,
       stock: line.countedQty as number,

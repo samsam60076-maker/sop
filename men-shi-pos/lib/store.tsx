@@ -30,6 +30,8 @@ import {
   saveStocktakeBins,
   saveStocktakeCounts,
   setStocktakeCountedAt,
+  upsertStocktakeLine,
+  removeStocktakeLine,
   removeBin,
   removeCategory,
   removeExpense,
@@ -154,6 +156,12 @@ type StoreContextValue = {
   saveStocktakeBins: (
     input: Parameters<typeof saveStocktakeBins>[1],
   ) => ReturnType<typeof saveStocktakeBins>;
+  upsertStocktakeLine: (
+    input: Parameters<typeof upsertStocktakeLine>[1],
+  ) => ReturnType<typeof upsertStocktakeLine>;
+  removeStocktakeLine: (
+    input: Parameters<typeof removeStocktakeLine>[1],
+  ) => ReturnType<typeof removeStocktakeLine>;
   setStocktakeCountedAt: (
     input: Parameters<typeof setStocktakeCountedAt>[1],
   ) => ReturnType<typeof setStocktakeCountedAt>;
@@ -243,6 +251,10 @@ function sanitizeState(value: unknown): AppState | null {
               : sheet.createdAt,
           lines: asList<StocktakeLine>(sheet.lines).map((line) => ({
             ...line,
+            id:
+              typeof line.id === "string" && line.id
+                ? line.id
+                : line.productId || undefined,
             bin: typeof line.bin === "string" ? line.bin : "",
             unitPrice:
               typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)
@@ -251,6 +263,10 @@ function sanitizeState(value: unknown): AppState | null {
             unitCost:
               typeof line.unitCost === "number" && Number.isFinite(line.unitCost)
                 ? line.unitCost
+                : undefined,
+            countedOn:
+              typeof line.countedOn === "string" && line.countedOn
+                ? line.countedOn
                 : undefined,
           })),
         }),
@@ -939,6 +955,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       saveStocktakeBins: (input) => {
         const result = saveStocktakeBins(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      upsertStocktakeLine: (input) => {
+        const result = upsertStocktakeLine(read(), input);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      removeStocktakeLine: (input) => {
+        const result = removeStocktakeLine(read(), input);
         if (result.ok) commit(result.state);
         return result;
       },

@@ -135,6 +135,7 @@ export type Movement = {
 };
 
 export type StocktakeLine = {
+  id?: string;
   productId: string;
   name: string;
   sku: string;
@@ -145,6 +146,7 @@ export type StocktakeLine = {
   countedQty: number | null;
   unitPrice?: number;
   unitCost?: number;
+  countedOn?: string;
 };
 
 export type Stocktake = {

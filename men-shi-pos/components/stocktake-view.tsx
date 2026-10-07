@@ -4,19 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardCheck, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { YmdPicker } from "@/components/ymd-picker";
 import {
   monthStocktakeTitle,
   stocktakeCountedAt,
+  stocktakeLineKey,
   stocktakeSummary,
 } from "@/lib/engine";
 import {
@@ -36,19 +28,12 @@ import { useStore } from "@/lib/store";
 import type { StocktakeLine } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type RowFilter = "all" | "pending" | "missing" | "surplus";
 type PrintMode = "none" | "blank" | "check" | "audit";
 type PrintSize = "small" | "mid";
 type PrintCols = 1 | 2;
 type PrintScope = "all" | "shown";
 const UNMARKED = "未註明";
-
-const FILTERS: { value: RowFilter; label: string }[] = [
-  { value: "all", label: "全部" },
-  { value: "pending", label: "未盤" },
-  { value: "missing", label: "缺失" },
-  { value: "surplus", label: "盤盈" },
-];
+const TOTALS = "盤點總計";
 
 function lineDiff(line: StocktakeLine) {
   if (line.countedQty == null) return null;
@@ -69,14 +54,6 @@ function lineSellPrice(
 ) {
   if (typeof line.unitPrice === "number") return line.unitPrice;
   return products.find((item) => item.id === line.productId)?.price ?? 0;
-}
-
-function lineBuyPrice(
-  line: StocktakeLine,
-  products: { id: string; price: number; cost: number }[],
-) {
-  if (typeof line.unitCost === "number") return line.unitCost;
-  return products.find((item) => item.id === line.productId)?.cost ?? 0;
 }
 
 function lineBin(line: StocktakeLine) {
@@ -124,28 +101,31 @@ export function StocktakeView() {
   const {
     state,
     startStocktake,
-    saveStocktakeCounts,
     confirmStocktake,
     discardStocktake,
     refreshStocktakeCatalog,
-    saveStocktakeBins,
+    upsertStocktakeLine,
+    removeStocktakeLine,
     setStocktakeCountedAt,
     addBin,
     removeBin,
   } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<RowFilter>("all");
-  const [binFilter, setBinFilter] = useState("all");
+  const [binFilter, setBinFilter] = useState("");
   const [binEditing, setBinEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [printMode, setPrintMode] = useState<PrintMode>("none");
   const [printSize, setPrintSize] = useState<PrintSize>("small");
   const [printCols, setPrintCols] = useState<PrintCols>(2);
   const [printScope, setPrintScope] = useState<PrintScope>("all");
-  const [draftCounts, setDraftCounts] = useState<Record<string, string>>({});
   const [takeDate, setTakeDate] = useState(toInputDate);
   const [newBin, setNewBin] = useState("");
+  const [draftRow, setDraftRow] = useState({
+    name: "",
+    date: "",
+    qty: "",
+    price: "",
+  });
 
   const sheets = state.stocktakes ?? [];
 
@@ -170,28 +150,20 @@ export function StocktakeView() {
   const printing = printMode !== "none";
   const printBlank = printMode === "blank";
   const printAudit = printMode === "audit";
+  const activeBin = binFilter === TOTALS ? "" : binFilter;
+
+  useEffect(() => {
+    if (!binFilter && binOptions[0]) setBinFilter(binOptions[0]);
+  }, [binFilter, binOptions]);
 
   const visible = useMemo(() => {
     if (!current) return [];
-    const source = printing ? current.lines : current.lines;
-    const q = query.trim().toLowerCase();
-    return source.filter((line) => {
-      if (printing && printScope === "all") return true;
-      const editing = Object.prototype.hasOwnProperty.call(
-        draftCounts,
-        line.productId,
-      );
-      const status = lineStatus(line);
-      const bin = line.bin?.trim() ? line.bin : UNMARKED;
-      if (binFilter !== "all" && bin !== binFilter && !editing) return false;
-      if (filter !== "all" && status !== filter && !editing) return false;
-      if (!q) return true;
-      return (
-        line.name.toLowerCase().includes(q) ||
-        line.sku.toLowerCase().includes(q)
-      );
+    return current.lines.filter((line) => {
+      if (printing && printScope === "all") return Boolean(line.bin?.trim());
+      if (binFilter === TOTALS) return Boolean(line.bin?.trim());
+      return lineBin(line) === binFilter;
     });
-  }, [current, query, filter, binFilter, draftCounts, printing, printScope]);
+  }, [current, binFilter, printing, printScope]);
 
   const grouped = useMemo(() => {
     const order = [...binOptions, UNMARKED];
@@ -251,6 +223,7 @@ export function StocktakeView() {
       const sheet = (next.stocktakes ?? []).find((item) => item.id === existing.id);
       const added = (sheet?.lines.length ?? before) - before;
       setSelectedId(existing.id);
+      setBinFilter(binOptions[0] ?? TOTALS);
       if (added > 0) {
         toast.success(`已補上 ${added} 項`);
       }
@@ -263,49 +236,43 @@ export function StocktakeView() {
     }
     setSelectedId(result.data.id);
     setReviewing(false);
-    setDraftCounts({});
-    toast.success(`已開立 ${result.data.number}，帳面數量已凍結`);
+    setBinFilter(binOptions[0] ?? TOTALS);
+    setDraftRow({ name: "", date: takeDate, qty: "", price: "" });
+    toast.success(`已開立 ${result.data.number}，選櫃子打名稱`);
   }
 
-  function countValue(line: StocktakeLine) {
-    if (Object.prototype.hasOwnProperty.call(draftCounts, line.productId)) {
-      return draftCounts[line.productId];
+  function lineDateValue(line: StocktakeLine) {
+    if (line.countedOn && /^\d{4}-\d{2}-\d{2}$/.test(line.countedOn)) {
+      return line.countedOn;
     }
-    return line.countedQty == null ? "" : String(line.countedQty);
+    if (line.countedOn) return toInputDate(new Date(line.countedOn));
+    return takeDate;
   }
 
-  function setCountDraft(productId: string, value: string) {
-    if (!current || locked) return;
-    if (value !== "" && !/^\d*$/.test(value)) return;
-    setDraftCounts((currentDraft) => ({
-      ...currentDraft,
-      [productId]: value,
-    }));
-  }
-
-  function commitCount(productId: string) {
-    if (!current || locked) return;
-    if (!Object.prototype.hasOwnProperty.call(draftCounts, productId)) return;
-    const value = draftCounts[productId] ?? "";
-    const countedQty = value.trim() === "" ? null : Number(value);
-    if (countedQty != null && (!Number.isFinite(countedQty) || countedQty < 0)) {
-      setDraftCounts((currentDraft) => {
-        const next = { ...currentDraft };
-        delete next[productId];
-        return next;
-      });
-      return;
-    }
-    const result = saveStocktakeCounts({
+  function saveLine(
+    lineId: string | undefined,
+    next: {
+      name: string;
+      date: string;
+      qty: string;
+      price: string;
+    },
+  ) {
+    if (!current || locked || !activeBin) return;
+    if (!next.name.trim()) return;
+    const qtyRaw = next.qty.trim();
+    const priceRaw = next.price.trim();
+    const result = upsertStocktakeLine({
       id: current.id,
-      counts: { [productId]: countedQty },
-    });
-    setDraftCounts((currentDraft) => {
-      const next = { ...currentDraft };
-      delete next[productId];
-      return next;
+      lineId,
+      bin: activeBin,
+      name: next.name,
+      countedOn: next.date || takeDate,
+      countedQty: qtyRaw === "" ? null : Number(qtyRaw),
+      unitPrice: priceRaw === "" ? undefined : Number(priceRaw),
     });
     if (!result.ok) toast.error(result.error);
+    return result;
   }
 
   function printSheet(mode: Exclude<PrintMode, "none">) {
@@ -329,15 +296,6 @@ export function StocktakeView() {
     toast.success(
       `${result.data.number} 已入帳，庫存已改成實盤數量`,
     );
-  }
-
-  function changeLineBin(productId: string, bin: string) {
-    if (!current || locked) return;
-    const result = saveStocktakeBins({
-      id: current.id,
-      bins: { [productId]: bin },
-    });
-    if (!result.ok) toast.error(result.error);
   }
 
   function removeSheet() {
@@ -441,7 +399,7 @@ export function StocktakeView() {
                 onClick={() => {
                   setSelectedId(sheet.id);
                   setReviewing(false);
-                  setDraftCounts({});
+                  setBinFilter(binOptions[0] ?? TOTALS);
                 }}
                 className={cn(
                   "rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
@@ -463,42 +421,14 @@ export function StocktakeView() {
         )}
 
         {current && (
-          <div className="mt-1.5 flex flex-col gap-1 sm:flex-row print:hidden">
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜尋名稱"
-              className="h-7 text-xs sm:max-w-[12rem]"
-            />
-            <div className="flex gap-1 overflow-x-auto">
-              {FILTERS.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setFilter(item.value)}
-                  className={cn(
-                    "rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
-                    filter === item.value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {current && (
           <div className="mt-2 flex flex-wrap items-center gap-1 print:hidden">
-            {["全部", ...binOptions].map((item) => {
-              const value = item === "全部" ? "all" : item;
+            {[...binOptions, TOTALS].map((item) => {
+              const value = item;
               const count =
-                item === "全部"
-                  ? current.lines.length
+                item === TOTALS
+                  ? cabinetGrand.amount
                   : current.lines.filter((line) => line.bin === item).length;
-              const canRemove = item !== "全部";
+              const canRemove = item !== TOTALS;
               return (
                 <span
                   key={item}
@@ -514,7 +444,7 @@ export function StocktakeView() {
                     onClick={() => setBinFilter(value)}
                     className="px-2.5 py-1"
                   >
-                    {item} {count}
+                    {item === TOTALS ? TOTALS : `${item} ${count}`}
                   </button>
                   {canRemove && binEditing ? (
                     <button
@@ -529,7 +459,7 @@ export function StocktakeView() {
                           toast.error(result.error);
                           return;
                         }
-                        if (binFilter === item) setBinFilter("all");
+                        if (binFilter === item) setBinFilter(binOptions[0] ?? TOTALS);
                         toast.success(`已減少 ${item}`);
                       }}
                     >
@@ -586,274 +516,258 @@ export function StocktakeView() {
       {!current ? (
         <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
           <p className="text-sm font-semibold">還沒有盤點單</p>
-          {state.products.length > 0 ? (
-            <Button onClick={openMonthSheet}>開立本月盤點單</Button>
-          ) : (
-            <p className="text-muted-foreground">還沒有商品</p>
-          )}
+          <Button onClick={openMonthSheet}>開立本月盤點單</Button>
         </div>
-      ) : visible.length === 0 ? (
-        <p className="py-16 text-center text-muted-foreground">
-          沒有符合的商品
+      ) : binFilter === TOTALS ? (
+        <div className="overflow-x-auto px-3 py-3 print:hidden">
+          <h2 className="text-sm font-semibold">盤點總計</h2>
+          <CabinetTotals
+            stats={cabinetStats}
+            grand={cabinetGrand}
+          />
+        </div>
+      ) : !activeBin ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">
+          請選櫃子開始打
         </p>
       ) : (
         <div className="overflow-x-auto print:hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">項</TableHead>
-                <TableHead>商品</TableHead>
-                <TableHead className="w-28">日期</TableHead>
-                <TableHead className="w-40">在哪一櫃</TableHead>
-                <TableHead className="text-right">帳面</TableHead>
-                <TableHead className="text-right">數量</TableHead>
-                <TableHead className="text-right">售價</TableHead>
-                <TableHead className="text-right">批價</TableHead>
-                <TableHead className="text-right">金額</TableHead>
-                <TableHead className="text-right">差異</TableHead>
-                <TableHead className={printAudit ? "print:hidden" : ""}>
-                  核對
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            {grouped.map((group) => (
-              <TableBody key={group.title}>
-                <TableRow>
-                  <TableCell
-                    colSpan={11}
-                    className="bg-muted/60 font-semibold"
-                  >
-                    {group.title}
-                    <span className="ml-2 font-normal text-muted-foreground">
-                      {group.lines.length} 項 · 帳面{" "}
-                      {group.lines.reduce(
-                        (sum, line) => sum + line.bookQty,
-                        0,
-                      )}
-                      {" · 售價 "}
-                      {twd(
-                        group.lines.reduce((sum, line) => {
-                          const qty = line.countedQty ?? line.bookQty;
-                          return (
-                            sum + qty * lineSellPrice(line, state.products)
-                          );
-                        }, 0),
-                      )}
-                    </span>
-                  </TableCell>
-                </TableRow>
-                {group.lines.map((line, index) => {
-                  const diff = lineDiff(line);
-                  const status = lineStatus(line);
-                  const sell = lineSellPrice(line, state.products);
-                  const buy = lineBuyPrice(line, state.products);
-                  const qty = lineQty(line);
-                  return (
-                    <TableRow
-                      key={line.productId}
-                      className={cn(
-                        status === "missing" && "bg-red-50 dark:bg-red-950/30",
-                        status === "surplus" &&
-                          "bg-amber-50 dark:bg-amber-950/20",
-                      )}
-                    >
-                      <TableCell className="text-muted-foreground tabular-nums">
-                        {index + 1}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{line.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {line.sku} · {line.unit}
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                        {formatDateYmd(stocktakeCountedAt(current))}
-                      </TableCell>
-                      <TableCell>
-                        {printBlank ? (
-                          <span className="block h-8 border-b border-foreground" />
-                        ) : locked || printing ? (
-                          <span>{line.bin?.trim() || UNMARKED}</span>
-                        ) : (
-                          <select
-                            value={line.bin ?? ""}
-                            onChange={(event) =>
-                              changeLineBin(line.productId, event.target.value)
-                            }
-                            aria-label={`${line.name} 在哪一櫃`}
-                            className="h-9 w-full max-w-[11rem] rounded-md border bg-background px-1.5 text-sm"
-                          >
-                            <option value="">{UNMARKED}</option>
-                            {binOptions.map((item) => (
-                              <option key={item} value={item}>
-                                {item}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {line.bookQty}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {locked ? (
-                          <span className="tabular-nums">
-                            {line.countedQty ?? "—"}
-                          </span>
-                        ) : (
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            autoComplete="off"
-                            value={countValue(line)}
-                            onChange={(event) =>
-                              setCountDraft(line.productId, event.target.value)
-                            }
-                            onBlur={() => commitCount(line.productId)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.currentTarget.blur();
-                              }
-                            }}
-                            placeholder="打數量"
-                            aria-label={`${line.name} 數量`}
-                            className={cn(
-                              "h-11 w-24 rounded-md border bg-background px-2 text-right text-base tabular-nums outline-none focus:border-primary",
-                              "print:h-8 print:border-foreground",
-                              printBlank &&
-                                "print:text-transparent print:placeholder:text-transparent",
-                            )}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {twd(sell)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {twd(buy)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {twd(qty * sell)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right tabular-nums",
-                          diff != null &&
-                            diff < 0 &&
-                            "font-semibold text-destructive",
-                        )}
-                      >
-                        {printBlank
-                          ? ""
-                          : diff == null
-                            ? "—"
-                            : diff > 0
-                              ? `+${diff}`
-                              : String(diff)}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-sm",
-                          printAudit && "print:hidden",
-                        )}
-                      >
-                        {printBlank
-                          ? ""
-                          : status === "pending"
-                            ? "未盤"
-                            : status === "missing"
-                              ? "缺失"
-                              : status === "surplus"
-                                ? "盤盈"
-                                : "相符"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {(() => {
-                  const stat = groupStat(group.lines, state.products);
-                  return (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-xs font-semibold">
-                        {group.title}合計
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-semibold tabular-nums">
-                        {stat.qty}
-                      </TableCell>
-                      <TableCell />
-                      <TableCell />
-                      <TableCell className="text-right text-xs font-semibold tabular-nums">
-                        {twd(stat.amount)}
-                      </TableCell>
-                      <TableCell colSpan={2} />
-                    </TableRow>
-                  );
-                })()}
-              </TableBody>
-            ))}
-          </Table>
-          {cabinetStats.length > 0 ? (
-            <div className="border-t px-3 py-3">
-              <h2 className="text-sm font-semibold">盤點總計</h2>
-              <table className="mt-1 w-full max-w-xl text-xs">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-1 text-left font-semibold">品項</th>
-                    <th className="py-1 text-right font-semibold">項數</th>
-                    <th className="py-1 text-right font-semibold">數量</th>
-                    <th className="py-1 text-right font-semibold">金額</th>
-                    <th className="py-1 text-right font-semibold">總計</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cabinetStats.map((item) => (
-                    <tr key={item.title} className="border-b border-dashed">
-                      <td className="py-0.5">{item.title}</td>
-                      <td className="py-0.5 text-right tabular-nums">
-                        {item.items}
-                      </td>
-                      <td className="py-0.5 text-right tabular-nums">
-                        {item.qty}
-                      </td>
-                      <td className="py-0.5 text-right tabular-nums">
-                        {twd(item.amount)}
-                      </td>
-                      <td className="py-0.5 text-right tabular-nums">
-                        {twd(item.amount)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t">
-                    <td className="py-1 font-semibold">合計</td>
-                    <td className="py-1 text-right font-semibold tabular-nums">
-                      {cabinetGrand.items}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="w-10 px-2 py-1.5 text-left text-xs font-semibold">
+                  項
+                </th>
+                <th className="px-2 py-1.5 text-left text-xs font-semibold">
+                  品項
+                </th>
+                <th className="w-36 px-2 py-1.5 text-left text-xs font-semibold">
+                  日期
+                </th>
+                <th className="w-20 px-2 py-1.5 text-right text-xs font-semibold">
+                  數量
+                </th>
+                <th className="w-24 px-2 py-1.5 text-right text-xs font-semibold">
+                  金額
+                </th>
+                <th className="w-24 px-2 py-1.5 text-right text-xs font-semibold">
+                  總計
+                </th>
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((line, index) => {
+                const sell = lineSellPrice(line, state.products);
+                const qty = line.countedQty ?? 0;
+                const key = stocktakeLineKey(line);
+                return (
+                  <tr key={key} className="border-b border-dashed">
+                    <td className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
+                      {index + 1}
                     </td>
-                    <td className="py-1 text-right font-semibold tabular-nums">
-                      {cabinetGrand.qty}
+                    <td className="px-2 py-1">
+                      <input
+                        list="stocktake-product-names"
+                        defaultValue={line.name}
+                        disabled={locked}
+                        onBlur={(event) =>
+                          saveLine(key, {
+                            name: event.target.value,
+                            date: lineDateValue(line),
+                            qty: line.countedQty == null ? "" : String(line.countedQty),
+                            price: String(sell),
+                          })
+                        }
+                        className="h-8 w-full rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                        aria-label={`${activeBin} 品項`}
+                      />
                     </td>
-                    <td className="py-1 text-right font-semibold tabular-nums">
-                      {twd(cabinetGrand.amount)}
+                    <td className="px-2 py-1">
+                      <YmdPicker
+                        tiny
+                        id={`stocktake-line-date-${key}`}
+                        value={lineDateValue(line)}
+                        onChange={(value) =>
+                          saveLine(key, {
+                            name: line.name,
+                            date: value,
+                            qty: line.countedQty == null ? "" : String(line.countedQty),
+                            price: String(sell),
+                          })
+                        }
+                      />
                     </td>
-                    <td className="py-1 text-right font-semibold tabular-nums">
-                      {twd(cabinetGrand.amount)}
+                    <td className="px-2 py-1">
+                      <input
+                        inputMode="numeric"
+                        defaultValue={line.countedQty == null ? "" : String(line.countedQty)}
+                        disabled={locked}
+                        onBlur={(event) =>
+                          saveLine(key, {
+                            name: line.name,
+                            date: lineDateValue(line),
+                            qty: event.target.value,
+                            price: String(sell),
+                          })
+                        }
+                        className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
+                        aria-label={`${line.name} 數量`}
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        inputMode="numeric"
+                        defaultValue={sell ? String(sell) : ""}
+                        disabled={locked}
+                        onBlur={(event) =>
+                          saveLine(key, {
+                            name: line.name,
+                            date: lineDateValue(line),
+                            qty: line.countedQty == null ? "" : String(line.countedQty),
+                            price: event.target.value,
+                          })
+                        }
+                        className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
+                        aria-label={`${line.name} 金額`}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-right text-sm tabular-nums">
+                      {twd(qty * sell)}
+                    </td>
+                    <td className="px-1 py-1">
+                      {locked ? null : (
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            const result = removeStocktakeLine({
+                              id: current.id,
+                              lineId: key,
+                            });
+                            if (!result.ok) toast.error(result.error);
+                          }}
+                        >
+                          刪
+                        </button>
+                      )}
                     </td>
                   </tr>
+                );
+              })}
+              {locked ? null : (
+                <tr className="border-b">
+                  <td className="px-2 py-1 text-xs text-muted-foreground">
+                    {visible.length + 1}
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      list="stocktake-product-names"
+                      value={draftRow.name}
+                      placeholder="打名稱"
+                      onChange={(event) =>
+                        setDraftRow((row) => ({ ...row, name: event.target.value }))
+                      }
+                      onBlur={() => {
+                        if (!draftRow.name.trim()) return;
+                        const hit = state.products.find(
+                          (item) => item.name === draftRow.name.trim(),
+                        );
+                        const next = {
+                          ...draftRow,
+                          date: draftRow.date || takeDate,
+                          price:
+                            draftRow.price ||
+                            (hit ? String(hit.price) : draftRow.price),
+                        };
+                        const result = saveLine(undefined, next);
+                        if (result?.ok) {
+                          setDraftRow({
+                            name: "",
+                            date: takeDate,
+                            qty: "",
+                            price: "",
+                          });
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.currentTarget.blur();
+                      }}
+                      className="h-8 w-full rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                      aria-label={`${activeBin} 新品項`}
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <YmdPicker
+                      tiny
+                      id="stocktake-new-date"
+                      value={draftRow.date || takeDate}
+                      onChange={(value) =>
+                        setDraftRow((row) => ({ ...row, date: value }))
+                      }
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      inputMode="numeric"
+                      value={draftRow.qty}
+                      placeholder="數量"
+                      onChange={(event) =>
+                        setDraftRow((row) => ({ ...row, qty: event.target.value }))
+                      }
+                      className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
+                      aria-label="新數量"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      inputMode="numeric"
+                      value={draftRow.price}
+                      placeholder="價錢"
+                      onChange={(event) =>
+                        setDraftRow((row) => ({ ...row, price: event.target.value }))
+                      }
+                      className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
+                      aria-label="新金額"
+                    />
+                  </td>
+                  <td className="px-2 py-1 text-right text-sm tabular-nums text-muted-foreground">
+                    {twd(
+                      (Number(draftRow.qty) || 0) * (Number(draftRow.price) || 0),
+                    )}
+                  </td>
+                  <td />
+                </tr>
+              )}
+              {(() => {
+                const stat = groupStat(visible, state.products);
+                return (
                   <tr>
-                    <td className="py-1 font-semibold">總計</td>
-                    <td />
-                    <td />
-                    <td />
-                    <td className="py-1 text-right font-semibold tabular-nums">
-                      {twd(cabinetGrand.amount)}
+                    <td className="px-2 py-2 text-xs font-semibold" colSpan={3}>
+                      {activeBin}合計
                     </td>
+                    <td className="px-2 py-2 text-right text-xs font-semibold tabular-nums">
+                      {stat.qty}
+                    </td>
+                    <td />
+                    <td className="px-2 py-2 text-right text-xs font-semibold tabular-nums">
+                      {twd(stat.amount)}
+                    </td>
+                    <td />
                   </tr>
-                </tfoot>
-              </table>
-            </div>
-          ) : null}
+                );
+              })()}
+            </tbody>
+          </table>
+          <datalist id="stocktake-product-names">
+            {state.products.map((item) => (
+              <option key={item.id} value={item.name} />
+            ))}
+          </datalist>
+          <p className="px-3 py-2 text-[11px] text-muted-foreground">
+            在這一櫃打名稱、日期、數量、價錢。打好各櫃後，按「盤點總計」看每一表的金額。
+          </p>
         </div>
       )}
 
@@ -962,6 +876,69 @@ export function StocktakeView() {
         </div>
       )}
     </div>
+  );
+}
+
+function CabinetTotals({
+  stats,
+  grand,
+}: {
+  stats: { title: string; items: number; qty: number; amount: number }[];
+  grand: { items: number; qty: number; amount: number };
+}) {
+  return (
+    <table className="mt-1 w-full max-w-xl text-xs">
+      <thead>
+        <tr className="border-b">
+          <th className="py-1 text-left font-semibold">品項</th>
+          <th className="py-1 text-right font-semibold">項數</th>
+          <th className="py-1 text-right font-semibold">數量</th>
+          <th className="py-1 text-right font-semibold">金額</th>
+          <th className="py-1 text-right font-semibold">總計</th>
+        </tr>
+      </thead>
+      <tbody>
+        {stats.length === 0 ? (
+          <tr>
+            <td colSpan={5} className="py-3 text-muted-foreground">
+              各櫃還沒有打品項
+            </td>
+          </tr>
+        ) : (
+          stats.map((item) => (
+            <tr key={item.title} className="border-b border-dashed">
+              <td className="py-0.5">{item.title}</td>
+              <td className="py-0.5 text-right tabular-nums">{item.items}</td>
+              <td className="py-0.5 text-right tabular-nums">{item.qty}</td>
+              <td className="py-0.5 text-right tabular-nums">{twd(item.amount)}</td>
+              <td className="py-0.5 text-right tabular-nums">{twd(item.amount)}</td>
+            </tr>
+          ))
+        )}
+      </tbody>
+      <tfoot>
+        <tr className="border-t">
+          <td className="py-1 font-semibold">合計</td>
+          <td className="py-1 text-right font-semibold tabular-nums">{grand.items}</td>
+          <td className="py-1 text-right font-semibold tabular-nums">{grand.qty}</td>
+          <td className="py-1 text-right font-semibold tabular-nums">
+            {twd(grand.amount)}
+          </td>
+          <td className="py-1 text-right font-semibold tabular-nums">
+            {twd(grand.amount)}
+          </td>
+        </tr>
+        <tr>
+          <td className="py-1 font-semibold">總計</td>
+          <td />
+          <td />
+          <td />
+          <td className="py-1 text-right font-semibold tabular-nums">
+            {twd(grand.amount)}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
   );
 }
 
