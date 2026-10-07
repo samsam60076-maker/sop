@@ -583,20 +583,20 @@ export function StocktakeView() {
                       />
                     </td>
                     <td className="px-2 py-1">
-                      <YmdPicker
-                        tiny
-                        allowEmpty
-                        futureYears
-                        id={`stocktake-line-date-${key}`}
+                      <input
+                        type="date"
                         value={lineExpiryValue(line)}
-                        onChange={(value) =>
+                        disabled={locked}
+                        onChange={(event) =>
                           saveLine(key, {
                             name: line.name,
-                            date: value,
+                            date: event.target.value,
                             qty: line.countedQty == null ? "" : String(line.countedQty),
                             price: String(sell),
                           })
                         }
+                        className="h-8 w-full min-w-[9.5rem] rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                        aria-label={`${line.name} 保存期限`}
                       />
                     </td>
                     <td className="px-2 py-1">
@@ -700,15 +700,14 @@ export function StocktakeView() {
                     />
                   </td>
                   <td className="px-2 py-1">
-                    <YmdPicker
-                      tiny
-                      allowEmpty
-                      futureYears
-                      id="stocktake-new-date"
+                    <input
+                      type="date"
                       value={draftRow.date}
-                      onChange={(value) =>
-                        setDraftRow((row) => ({ ...row, date: value }))
+                      onChange={(event) =>
+                        setDraftRow((row) => ({ ...row, date: event.target.value }))
                       }
+                      className="h-8 w-full min-w-[9.5rem] rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                      aria-label="新保存期限"
                     />
                   </td>
                   <td className="px-2 py-1">
