@@ -225,6 +225,19 @@
     .st-excel-sheet {
       break-inside: avoid;
     }
+    .st-exp-expired,
+    .st-exp-year {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .st-exp-expired {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+    .st-exp-year {
+      color: #b45309;
+      font-weight: 700;
+    }
     .rp-day-sold-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;

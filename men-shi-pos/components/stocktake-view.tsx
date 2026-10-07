@@ -128,6 +128,41 @@ function displayExpiry(raw: string) {
   return `${year}/${Number(month)}/${Number(day)}`;
 }
 
+type ExpiryTone = "" | "expired" | "thisYear";
+
+function expiryTone(raw: string, today = new Date()): ExpiryTone {
+  const iso = parseExpiryInput(raw);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [year, month, day] = iso.split("-").map(Number);
+  const nowYear = today.getFullYear();
+  const nowMonth = today.getMonth() + 1;
+  const nowDay = today.getDate();
+  if (
+    year < nowYear ||
+    (year === nowYear && (month < nowMonth || (month === nowMonth && day < nowDay)))
+  ) {
+    return "expired";
+  }
+  if (year === nowYear) return "thisYear";
+  return "";
+}
+
+function expiryInputClass(tone: ExpiryTone) {
+  if (tone === "expired") {
+    return "border-red-500 bg-red-50 font-semibold text-red-800";
+  }
+  if (tone === "thisYear") {
+    return "border-amber-500 bg-amber-50 font-semibold text-amber-950";
+  }
+  return "bg-background";
+}
+
+function expiryMark(tone: ExpiryTone) {
+  if (tone === "expired") return "已過期";
+  if (tone === "thisYear") return "今年";
+  return "";
+}
+
 function chunkLines<T>(list: T[], cols: number): T[][] {
   if (cols <= 1) return [list];
   if (list.length === 0) return Array.from({ length: cols }, () => []);
@@ -279,7 +314,7 @@ export function StocktakeView() {
   }
 
   function lineExpiryValue(line: StocktakeLine) {
-    return displayExpiry(line.expiresOn || line.countedOn || "");
+    return displayExpiry(line.expiresOn || "");
   }
 
   function saveLine(
@@ -576,6 +611,8 @@ export function StocktakeView() {
                 const sell = lineSellPrice(line, state.products);
                 const qty = line.countedQty ?? 0;
                 const key = stocktakeLineKey(line);
+                const tone = expiryTone(line.expiresOn || "");
+                const mark = expiryMark(tone);
                 return (
                   <tr key={key} className="border-b border-dashed">
                     <td className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
@@ -612,8 +649,11 @@ export function StocktakeView() {
                             price: String(sell),
                           })
                         }
-                        className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
-                        aria-label={`${line.name} 保存期限`}
+                        className={cn(
+                          "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
+                          expiryInputClass(tone),
+                        )}
+                        aria-label={`${line.name} 保存期限${mark ? ` ${mark}` : ""}`}
                       />
                     </td>
                     <td className="px-2 py-1">
@@ -724,7 +764,10 @@ export function StocktakeView() {
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, date: event.target.value }))
                       }
-                      className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
+                      className={cn(
+                        "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
+                        expiryInputClass(expiryTone(draftRow.date)),
+                      )}
                       aria-label="新保存期限"
                     />
                   </td>
@@ -786,7 +829,14 @@ export function StocktakeView() {
             ))}
           </datalist>
           <p className="px-3 py-2 text-[11px] text-muted-foreground">
-            保存期限直接打數字，例如 20261007。數量可以先空白。按「暫時存檔」先收工，晚點再回來填數量。
+            保存期限直接打數字，例如 20261007。
+            <span className="ml-1 rounded bg-amber-50 px-1 font-medium text-amber-950">
+              橘＝今年到期
+            </span>
+            <span className="ml-1 rounded bg-red-50 px-1 font-medium text-red-800">
+              紅＝已過期
+            </span>
+            ，這些要先賣。數量可以先空白，按「暫時存檔」晚點再填。
           </p>
         </div>
       )}
@@ -1040,11 +1090,19 @@ function StocktakePrintSheet({
                       {col.map((line) => {
                         const sell = lineSellPrice(line, products);
                         const qty = lineQty(line);
+                        const tone = expiryTone(line.expiresOn || "");
+                        const mark = expiryMark(tone);
                         return (
                           <tr key={line.productId || line.id}>
                             <td>{line.name}</td>
-                            <td>
-                              {displayExpiry(line.expiresOn || line.countedOn || "")}
+                            <td
+                              className={cn(
+                                tone === "expired" && "st-exp-expired",
+                                tone === "thisYear" && "st-exp-year",
+                              )}
+                            >
+                              {displayExpiry(line.expiresOn || "")}
+                              {mark ? ` ${mark}` : ""}
                             </td>
                             <td className="num">
                               {printBlank ? "" : qty}
