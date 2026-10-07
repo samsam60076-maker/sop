@@ -112,7 +112,7 @@ export function defaultSop(shopName: string): SopSection[] {
     {
       id: "stocktake",
       title: "月底盤點",
-      body: `1. 到盤點，先選盤點日期，再按「開立本月盤點單」，帳面數量會先凍結。日期可之後再改，列印與總表依這一天。\n2. 選櫃子打名稱、保存期限、數量、價錢。數量可以先空白，按「暫時存檔」晚點再填。今年到期橘底、已過期紅底，這些要先賣。列印當月盤點表會印全部櫃子。\n3. 實盤少於帳面就是缺失，要查少貨原因。\n4. 數量填完再按核對後入帳，未盤的項目不會改庫存。`,
+      body: `1. 到盤點，先選盤點日期，再按「開立本月盤點單」，帳面數量會先凍結。日期可之後再改，列印與總表依這一天。\n2. 選櫃子打名稱、保存期限、數量、價錢。保存期限只打數字，例如 271010。今年快過期與 2027 以後的顏色可自己選。數量可以先空白，按「暫時存檔」晚點再填。列印當月盤點表會印全部櫃子。\n3. 實盤少於帳面就是缺失，要查少貨原因。\n4. 數量填完再按核對後入帳，未盤的項目不會改庫存。`,
     },
     {
       id: "report",
@@ -132,6 +132,28 @@ export function defaultSop(shopName: string): SopSection[] {
   ];
 }
 
+export const DEFAULT_EXPIRY_SOON_COLOR = "#f59e0b";
+export const DEFAULT_EXPIRY_LATER_COLOR = "#7dd3fc";
+
+export function normalizeHexColor(value: unknown, fallback: string) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (/^#[0-9a-fA-F]{6}$/.test(text)) return `#${text.slice(1).toLowerCase()}`;
+  if (/^#[0-9a-fA-F]{3}$/.test(text)) {
+    const [, r, g, b] = text;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return fallback;
+}
+
+export function contrastText(bg: string) {
+  const hex = normalizeHexColor(bg, "#ffffff").slice(1);
+  const r = Number.parseInt(hex.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(hex.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(hex.slice(4, 6), 16) / 255;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum > 0.62 ? "#1c1917" : "#ffffff";
+}
+
 export function defaultSettings(): ShopSettings {
   return {
     shopName: DEFAULT_SHOP_NAME,
@@ -139,6 +161,8 @@ export function defaultSettings(): ShopSettings {
     categories: [...DEFAULT_CATEGORIES],
     bins: [...DEFAULT_BINS],
     sop: defaultSop(DEFAULT_SHOP_NAME),
+    expirySoonColor: DEFAULT_EXPIRY_SOON_COLOR,
+    expiryLaterColor: DEFAULT_EXPIRY_LATER_COLOR,
   };
 }
 
@@ -161,6 +185,14 @@ export function normalizeSettings(
     categories: normalizeCategories(value?.categories),
     bins: normalizeBins(value?.bins),
     sop,
+    expirySoonColor: normalizeHexColor(
+      value?.expirySoonColor,
+      base.expirySoonColor,
+    ),
+    expiryLaterColor: normalizeHexColor(
+      value?.expiryLaterColor,
+      base.expiryLaterColor,
+    ),
   };
 }
 

@@ -12,8 +12,7 @@ import type { ShopSettings } from "@/lib/types";
 
 function cloneSettings(settings: ShopSettings): ShopSettings {
   return {
-    shopName: settings.shopName,
-    branchName: settings.branchName,
+    ...settings,
     categories: [...settings.categories],
     bins: [...settings.bins],
     sop: settings.sop.map((section) => ({ ...section })),

@@ -206,6 +206,8 @@ export type ShopSettings = {
   categories: string[];
   bins: string[];
   sop: SopSection[];
+  expirySoonColor: string;
+  expiryLaterColor: string;
 };
 
 export type PreorderSource = "facebook" | "line" | "phone" | "other";

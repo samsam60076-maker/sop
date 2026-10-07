@@ -552,6 +552,8 @@ function spreadCatalog(workspace: Workspace, source: AppState): Workspace {
         categories: [...source.settings.categories],
         bins: [...source.settings.bins],
         sop: source.settings.sop.map((section) => ({ ...section })),
+        expirySoonColor: source.settings.expirySoonColor,
+        expiryLaterColor: source.settings.expiryLaterColor,
       },
     };
   }
