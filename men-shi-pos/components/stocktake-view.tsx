@@ -314,6 +314,17 @@ export function StocktakeView() {
     return result;
   }
 
+  function parkSheet() {
+    if (locked || !current) return;
+    if (draftRow.name.trim()) {
+      const result = saveLine(undefined, draftRow);
+      if (result?.ok) {
+        setDraftRow({ name: "", date: "", qty: "", price: "" });
+      }
+    }
+    toast.success("已暫存。這張單還在，數量可以晚點再填。");
+  }
+
   function printSheet(mode: Exclude<PrintMode, "none">) {
     setPrintMode(mode);
     const done = () => {
@@ -453,7 +464,7 @@ export function StocktakeView() {
                   return `${ymd.month}/${ymd.day}`;
                 })()}{" "}
                 {sheet.title}
-                {sheet.status === "draft" ? " · 未入帳" : " · 已入帳"}
+                {sheet.status === "draft" ? " · 未入帳 · 可補數量" : " · 已入帳"}
               </button>
             ))}
           </div>
@@ -810,7 +821,7 @@ export function StocktakeView() {
             ))}
           </datalist>
           <p className="px-3 py-2 text-[11px] text-muted-foreground">
-            保存期限直接打數字，例如 20261007。打好各櫃後，按「盤點總計」看每一表的金額。
+            保存期限直接打數字，例如 20261007。數量可以先空白。按「暫時存檔」先收工，晚點再回來填數量。
           </p>
         </div>
       )}
@@ -885,7 +896,9 @@ export function StocktakeView() {
             <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
               <p className="text-sm">
                 {summary
-                  ? `已盤 ${summary.counted}/${summary.total} · 缺失 ${summary.missing} 項`
+                  ? summary.pending > 0
+                    ? `已記下 ${summary.total} 項 · 數量未填 ${summary.pending} 項`
+                    : `已盤 ${summary.counted}/${summary.total} · 缺失 ${summary.missing} 項`
                   : ""}
               </p>
               <div className="flex gap-2">
@@ -894,9 +907,17 @@ export function StocktakeView() {
                 </Button>
                 <Button
                   type="button"
+                  variant={summary && summary.pending > 0 ? "default" : "outline"}
+                  onClick={parkSheet}
+                >
+                  暫時存檔
+                </Button>
+                <Button
+                  type="button"
+                  variant={summary && summary.pending > 0 ? "outline" : "default"}
                   onClick={() => {
                     if (!summary || summary.counted === 0) {
-                      toast.error("請先填實盤數量");
+                      toast.error("數量可以晚點填。現在請按「暫時存檔」。要入帳再填數量。");
                       return;
                     }
                     setReviewing(true);
