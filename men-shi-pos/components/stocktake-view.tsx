@@ -88,6 +88,49 @@ function groupStat(
   );
 }
 
+function parseExpiryInput(raw: string) {
+  const text = raw.trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const digits = text.replace(/\D/g, "");
+  let year = 0;
+  let month = 0;
+  let day = 0;
+  if (digits.length === 8) {
+    year = Number(digits.slice(0, 4));
+    month = Number(digits.slice(4, 6));
+    day = Number(digits.slice(6, 8));
+  } else if (digits.length === 7) {
+    year = Number(digits.slice(0, 3)) + 1911;
+    month = Number(digits.slice(3, 5));
+    day = Number(digits.slice(5, 7));
+  } else if (digits.length === 6) {
+    const yy = Number(digits.slice(0, 2));
+    year = yy >= 70 ? 1900 + yy : 2000 + yy;
+    month = Number(digits.slice(2, 4));
+    day = Number(digits.slice(4, 6));
+  } else {
+    return text;
+  }
+  if (
+    !year ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return text;
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function displayExpiry(raw: string) {
+  const iso = parseExpiryInput(raw);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return raw;
+  const [year, month, day] = iso.split("-");
+  return `${year}/${Number(month)}/${Number(day)}`;
+}
+
 function chunkLines<T>(list: T[], cols: number): T[][] {
   if (cols <= 1) return [list];
   if (list.length === 0) return Array.from({ length: cols }, () => []);
@@ -242,10 +285,7 @@ export function StocktakeView() {
   }
 
   function lineExpiryValue(line: StocktakeLine) {
-    const raw = line.expiresOn || line.countedOn || "";
-    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-    if (raw) return toInputDate(new Date(raw));
-    return "";
+    return displayExpiry(line.expiresOn || line.countedOn || "");
   }
 
   function saveLine(
@@ -266,7 +306,7 @@ export function StocktakeView() {
       lineId,
       bin: activeBin,
       name: next.name,
-      expiresOn: next.date,
+      expiresOn: parseExpiryInput(next.date),
       countedQty: qtyRaw === "" ? null : Number(qtyRaw),
       unitPrice: priceRaw === "" ? undefined : Number(priceRaw),
     });
@@ -584,10 +624,11 @@ export function StocktakeView() {
                     </td>
                     <td className="px-2 py-1">
                       <input
-                        type="date"
-                        value={lineExpiryValue(line)}
+                        inputMode="numeric"
+                        defaultValue={lineExpiryValue(line)}
                         disabled={locked}
-                        onChange={(event) =>
+                        placeholder="20261007"
+                        onBlur={(event) =>
                           saveLine(key, {
                             name: line.name,
                             date: event.target.value,
@@ -595,7 +636,7 @@ export function StocktakeView() {
                             price: String(sell),
                           })
                         }
-                        className="h-8 w-full min-w-[9.5rem] rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                        className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
                         aria-label={`${line.name} 保存期限`}
                       />
                     </td>
@@ -701,12 +742,13 @@ export function StocktakeView() {
                   </td>
                   <td className="px-2 py-1">
                     <input
-                      type="date"
+                      inputMode="numeric"
                       value={draftRow.date}
+                      placeholder="20261007"
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, date: event.target.value }))
                       }
-                      className="h-8 w-full min-w-[9.5rem] rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
+                      className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
                       aria-label="新保存期限"
                     />
                   </td>
@@ -768,7 +810,7 @@ export function StocktakeView() {
             ))}
           </datalist>
           <p className="px-3 py-2 text-[11px] text-muted-foreground">
-            在這一櫃打名稱、保存期限、數量、價錢。打好各櫃後，按「盤點總計」看每一表的金額。
+            保存期限直接打數字，例如 20261007。打好各櫃後，按「盤點總計」看每一表的金額。
           </p>
         </div>
       )}
@@ -1062,7 +1104,7 @@ function StocktakePrintSheet({
                           <tr key={line.productId || line.id}>
                             <td>{line.name}</td>
                             <td>
-                              {line.expiresOn || line.countedOn || ""}
+                              {displayExpiry(line.expiresOn || line.countedOn || "")}
                             </td>
                             <td className="num">
                               {printBlank ? "" : qty}
