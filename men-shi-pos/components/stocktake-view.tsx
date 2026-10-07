@@ -809,9 +809,6 @@ export function StocktakeView() {
               <option key={item.id} value={item.name} />
             ))}
           </datalist>
-          <p className="px-3 py-2 text-[11px] text-muted-foreground">
-            保存期限只打數字，不用斜線。今年的紅底，2027以後不標色。數量可以先空白，按「暫時存檔」。
-          </p>
         </div>
       )}
 
