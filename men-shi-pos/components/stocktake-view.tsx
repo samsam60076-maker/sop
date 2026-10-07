@@ -492,15 +492,13 @@ export function StocktakeView() {
 
         {current && (
           <div className="mt-2 flex flex-wrap items-center gap-1 print:hidden">
-            {["全部", ...binOptions, UNMARKED].map((item) => {
+            {["全部", ...binOptions].map((item) => {
               const value = item === "全部" ? "all" : item;
               const count =
                 item === "全部"
                   ? current.lines.length
-                  : item === UNMARKED
-                    ? current.lines.filter((line) => !line.bin?.trim()).length
-                    : current.lines.filter((line) => line.bin === item).length;
-              const canRemove = item !== "全部" && item !== UNMARKED;
+                  : current.lines.filter((line) => line.bin === item).length;
+              const canRemove = item !== "全部";
               return (
                 <span
                   key={item}
