@@ -189,6 +189,42 @@
     .stocktake-print .text-muted-foreground {
       color: #444 !important;
     }
+    .st-excel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4mm;
+    }
+    .st-excel-grid-one {
+      grid-template-columns: 1fr;
+    }
+    .st-excel-grid table,
+    .st-excel-summary {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .st-excel-grid th,
+    .st-excel-grid td,
+    .st-excel-summary th,
+    .st-excel-summary td {
+      border-bottom: 1px solid #ccc;
+      padding: 1px 3px;
+      text-align: left;
+    }
+    .st-excel-grid .num,
+    .st-excel-summary .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .st-excel-grid tfoot td,
+    .st-excel-summary tfoot td {
+      font-weight: 700;
+      border-top: 2px solid #111;
+      border-bottom: 0;
+    }
+    .st-excel-sheet {
+      break-inside: avoid;
+    }
     .rp-day-sold-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;

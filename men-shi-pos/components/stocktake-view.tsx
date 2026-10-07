@@ -28,10 +28,8 @@ import {
   ymdParts,
 } from "@/lib/format";
 import {
-  displayBin,
   displayShopName,
   listedBins,
-  listedCategories,
   normalizeSettings,
 } from "@/lib/shop";
 import { useStore } from "@/lib/store";
@@ -79,6 +77,47 @@ function lineBuyPrice(
 ) {
   if (typeof line.unitCost === "number") return line.unitCost;
   return products.find((item) => item.id === line.productId)?.cost ?? 0;
+}
+
+function lineBin(line: StocktakeLine) {
+  return line.bin?.trim() ? line.bin : UNMARKED;
+}
+
+function lineQty(line: StocktakeLine) {
+  return line.countedQty ?? line.bookQty;
+}
+
+function lineAmount(
+  line: StocktakeLine,
+  products: { id: string; price: number; cost: number }[],
+) {
+  return lineQty(line) * lineSellPrice(line, products);
+}
+
+function groupStat(
+  lines: StocktakeLine[],
+  products: { id: string; price: number; cost: number }[],
+) {
+  return lines.reduce(
+    (acc, line) => {
+      const qty = lineQty(line);
+      return {
+        items: acc.items + 1,
+        qty: acc.qty + qty,
+        amount: acc.amount + qty * lineSellPrice(line, products),
+      };
+    },
+    { items: 0, qty: 0, amount: 0 },
+  );
+}
+
+function chunkLines<T>(list: T[], cols: number): T[][] {
+  if (cols <= 1) return [list];
+  if (list.length === 0) return Array.from({ length: cols }, () => []);
+  const size = Math.ceil(list.length / cols);
+  return Array.from({ length: cols }, (_, index) =>
+    list.slice(index * size, index * size + size),
+  );
 }
 
 export function StocktakeView() {
@@ -155,36 +194,41 @@ export function StocktakeView() {
   }, [current, query, filter, binFilter, draftCounts, printing, printScope]);
 
   const grouped = useMemo(() => {
-    if (printAudit) {
-      const order = listedBins(normalizeSettings(state.settings), visible);
-      const groups = order
-        .map((bin) => ({
-          title: bin,
-          lines: visible.filter((line) => displayBin(line.bin) === bin),
-        }))
-        .filter((group) => group.lines.length > 0);
-      const leftover = visible.filter((line) => !line.bin?.trim());
-      if (leftover.length > 0) {
-        groups.push({ title: UNMARKED, lines: leftover });
-      }
-      return groups;
-    }
-    const order = listedCategories(normalizeSettings(state.settings), visible);
-    const groups = order
-      .map((category) => ({
-        title: category,
-        lines: visible.filter((line) => line.category === category),
+    const order = [...binOptions, UNMARKED];
+    return order
+      .map((bin) => ({
+        title: bin,
+        lines: visible.filter((line) => lineBin(line) === bin),
       }))
       .filter((group) => group.lines.length > 0);
-    const seen = new Set(
-      groups.flatMap((group) => group.lines.map((line) => line.productId)),
-    );
-    const leftover = visible.filter((line) => !seen.has(line.productId));
-    if (leftover.length > 0) {
-      groups.push({ title: "未分類", lines: leftover });
-    }
-    return groups;
-  }, [state.settings, visible, printAudit]);
+  }, [binOptions, visible]);
+
+  const cabinetStats = useMemo(() => {
+    if (!current) return [];
+    const order = [...binOptions, UNMARKED];
+    return order
+      .map((bin) => ({
+        title: bin,
+        ...groupStat(
+          current.lines.filter((line) => lineBin(line) === bin),
+          state.products,
+        ),
+      }))
+      .filter((item) => item.items > 0);
+  }, [binOptions, current, state.products]);
+
+  const cabinetGrand = useMemo(
+    () =>
+      cabinetStats.reduce(
+        (acc, item) => ({
+          items: acc.items + item.items,
+          qty: acc.qty + item.qty,
+          amount: acc.amount + item.amount,
+        }),
+        { items: 0, qty: 0, amount: 0 },
+      ),
+    [cabinetStats],
+  );
 
   const variances = current
     ? current.lines.filter((line) => {
@@ -449,6 +493,12 @@ export function StocktakeView() {
         )}
 
         {current && (
+          <p className="mt-1.5 text-[11px] text-muted-foreground print:hidden">
+            先把商品選到櫃子，再一櫃一櫃打數量。最下面是各櫃盤點總計。
+          </p>
+        )}
+
+        {current && (
           <div className="mt-1.5 flex flex-col gap-1 sm:flex-row print:hidden">
             <Input
               value={query}
@@ -635,7 +685,7 @@ export function StocktakeView() {
                   const status = lineStatus(line);
                   const sell = lineSellPrice(line, state.products);
                   const buy = lineBuyPrice(line, state.products);
-                  const qty = line.countedQty ?? line.bookQty;
+                  const qty = lineQty(line);
                   return (
                     <TableRow
                       key={line.productId}
@@ -759,9 +809,89 @@ export function StocktakeView() {
                     </TableRow>
                   );
                 })}
+                {(() => {
+                  const stat = groupStat(group.lines, state.products);
+                  return (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-xs font-semibold">
+                        {group.title}合計
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-semibold tabular-nums">
+                        {stat.qty}
+                      </TableCell>
+                      <TableCell />
+                      <TableCell />
+                      <TableCell className="text-right text-xs font-semibold tabular-nums">
+                        {twd(stat.amount)}
+                      </TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  );
+                })()}
               </TableBody>
             ))}
           </Table>
+          {cabinetStats.length > 0 ? (
+            <div className="border-t px-3 py-3">
+              <h2 className="text-sm font-semibold">盤點總計</h2>
+              <table className="mt-1 w-full max-w-xl text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="py-1 text-left font-semibold">品項</th>
+                    <th className="py-1 text-right font-semibold">項數</th>
+                    <th className="py-1 text-right font-semibold">數量</th>
+                    <th className="py-1 text-right font-semibold">金額</th>
+                    <th className="py-1 text-right font-semibold">總計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cabinetStats.map((item) => (
+                    <tr key={item.title} className="border-b border-dashed">
+                      <td className="py-0.5">{item.title}</td>
+                      <td className="py-0.5 text-right tabular-nums">
+                        {item.items}
+                      </td>
+                      <td className="py-0.5 text-right tabular-nums">
+                        {item.qty}
+                      </td>
+                      <td className="py-0.5 text-right tabular-nums">
+                        {twd(item.amount)}
+                      </td>
+                      <td className="py-0.5 text-right tabular-nums">
+                        {twd(item.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t">
+                    <td className="py-1 font-semibold">合計</td>
+                    <td className="py-1 text-right font-semibold tabular-nums">
+                      {cabinetGrand.items}
+                    </td>
+                    <td className="py-1 text-right font-semibold tabular-nums">
+                      {cabinetGrand.qty}
+                    </td>
+                    <td className="py-1 text-right font-semibold tabular-nums">
+                      {twd(cabinetGrand.amount)}
+                    </td>
+                    <td className="py-1 text-right font-semibold tabular-nums">
+                      {twd(cabinetGrand.amount)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 font-semibold">總計</td>
+                    <td />
+                    <td />
+                    <td />
+                    <td className="py-1 text-right font-semibold tabular-nums">
+                      {twd(cabinetGrand.amount)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -928,7 +1058,18 @@ function StocktakePrintSheet({
   printSize: PrintSize;
   printCols: PrintCols;
 }) {
-  const total = groups.reduce((sum, group) => sum + group.lines.length, 0);
+  const stats = groups.map((group) => ({
+    title: group.title,
+    ...groupStat(group.lines, products),
+  }));
+  const grand = stats.reduce(
+    (acc, item) => ({
+      items: acc.items + item.items,
+      qty: acc.qty + item.qty,
+      amount: acc.amount + item.amount,
+    }),
+    { items: 0, qty: 0, amount: 0 },
+  );
   return (
     <div
       className={cn(
@@ -937,81 +1078,131 @@ function StocktakePrintSheet({
       )}
     >
       <p className="font-semibold">
-        {shopName} · {title} · {number} · {total}項
+        {shopName} · {printAudit ? "冰箱抽查表" : title} · {number} · {countedOn}
       </p>
       <p className="text-[0.95em] text-muted-foreground">
-        盤點日 {countedOn}
-        {confirmedAt ? ` · 入帳 ${confirmedAt}` : " · 草稿"}
+        {confirmedAt ? `入帳 ${confirmedAt}` : "草稿"}
       </p>
-      <div
-        className={cn(
-          "mt-2",
-          printCols === 2 && "stocktake-print-cols",
-        )}
-      >
-        {groups.map((group) => (
+      {groups.map((group) => {
+        const cols = chunkLines(group.lines, printCols);
+        const stat = groupStat(group.lines, products);
+        return (
           <section
             key={group.title}
-            className="stocktake-print-group mb-2"
+            className="stocktake-print-group st-excel-sheet mb-3"
           >
-            <h3 className="border-b border-foreground font-semibold">
-              {group.title}
-              <span className="ml-1 font-normal">
-                {group.lines.length}項 · 帳
-                {group.lines.reduce((sum, line) => sum + line.bookQty, 0)}
-              </span>
+            <h3 className="mb-1 text-center font-semibold">
+              {group.title}盤點
             </h3>
-            <ul>
-              {group.lines.map((line, index) => {
-                const diff = lineDiff(line);
-                const sell = lineSellPrice(line, products);
-                const buy = lineBuyPrice(line, products);
-                const qty = line.countedQty ?? line.bookQty;
+            <div
+              className={cn(
+                "st-excel-grid",
+                printCols === 1 && "st-excel-grid-one",
+              )}
+            >
+              {cols.map((col, colIndex) => {
+                const colStat = groupStat(col, products);
                 return (
-                  <li
-                    key={line.productId}
-                    className="stocktake-print-line grid items-center gap-x-1 border-b border-foreground/25 py-px"
-                    style={{
-                      gridTemplateColumns: printAudit
-                        ? "1.15rem minmax(0,1fr) 3.4rem 1.5rem 2.1rem 2rem 2rem 2.2rem 1.4rem"
-                        : "1.15rem minmax(0,1fr) 3.4rem 2.2rem 1.5rem 2.1rem 2rem 2rem 2.2rem 1.4rem",
-                    }}
-                  >
-                    <span className="tabular-nums text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <span className="min-w-0 truncate">{line.name}</span>
-                    <span className="truncate tabular-nums">{countedOn}</span>
-                    {printAudit ? null : (
-                      <span className="min-w-0 truncate">
-                        {line.bin?.trim() || "—"}
-                      </span>
-                    )}
-                    <span className="text-right tabular-nums">
-                      {line.bookQty}
-                    </span>
-                    <span className="min-h-[1.1em] border-b border-foreground text-right tabular-nums">
-                      {printBlank ? "" : (line.countedQty ?? "")}
-                    </span>
-                    <span className="text-right tabular-nums">{twd(sell)}</span>
-                    <span className="text-right tabular-nums">{twd(buy)}</span>
-                    <span className="text-right tabular-nums">
-                      {printBlank ? "" : twd(qty * sell)}
-                    </span>
-                    <span className="text-right tabular-nums">
-                      {printBlank || diff == null
-                        ? ""
-                        : diff > 0
-                          ? `+${diff}`
-                          : String(diff)}
-                    </span>
-                  </li>
+                  <table key={colIndex}>
+                    <thead>
+                      <tr>
+                        <th>品項</th>
+                        <th className="num">數量</th>
+                        <th className="num">金額</th>
+                        <th className="num">總計</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {col.map((line) => {
+                        const sell = lineSellPrice(line, products);
+                        const qty = lineQty(line);
+                        return (
+                          <tr key={line.productId}>
+                            <td>{line.name}</td>
+                            <td className="num">
+                              {printBlank ? "" : qty}
+                            </td>
+                            <td className="num">{Math.round(sell)}</td>
+                            <td className="num">
+                              {printBlank ? "" : Math.round(qty * sell)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td>合計</td>
+                        <td className="num">
+                          {printBlank ? "" : colStat.qty}
+                        </td>
+                        <td />
+                        <td className="num">
+                          {printBlank ? "" : Math.round(colStat.amount)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 );
               })}
-            </ul>
+            </div>
+            <p className="mt-1 font-semibold tabular-nums">
+              總計 {printBlank ? "" : Math.round(stat.amount)}
+            </p>
           </section>
-        ))}
-      </div>
+        );
+      })}
+      <section className="st-excel-sheet mt-4">
+        <h3 className="mb-1 text-center font-semibold">盤點總計</h3>
+        <table className="st-excel-summary">
+          <thead>
+            <tr>
+              <th>品項</th>
+              <th className="num">項數</th>
+              <th className="num">數量</th>
+              <th className="num">金額</th>
+              <th className="num">總計</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((item) => (
+              <tr key={item.title}>
+                <td>{item.title}</td>
+                <td className="num">{item.items}</td>
+                <td className="num">{printBlank ? "" : item.qty}</td>
+                <td className="num">
+                  {printBlank ? "" : Math.round(item.amount)}
+                </td>
+                <td className="num">
+                  {printBlank ? "" : Math.round(item.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>合計</td>
+              <td className="num">{grand.items}</td>
+              <td className="num">{printBlank ? "" : grand.qty}</td>
+              <td className="num">
+                {printBlank ? "" : Math.round(grand.amount)}
+              </td>
+              <td className="num">
+                {printBlank ? "" : Math.round(grand.amount)}
+              </td>
+            </tr>
+            <tr>
+              <td>總計</td>
+              <td />
+              <td />
+              <td />
+              <td className="num">
+                {printBlank ? "" : Math.round(grand.amount)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
       <p className="mt-3">
         {printAudit
           ? "抽查人：__________　覆核：__________　日期：__________"
