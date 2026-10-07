@@ -317,37 +317,34 @@ export function StocktakeView() {
 
   return (
     <div className="flex flex-col pb-36 print:pb-0">
-      <div className="border-b bg-card px-4 py-4 md:px-6 print:hidden">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-heading flex items-center gap-2 text-3xl font-semibold">
-              <ClipboardCheck className="size-8" />
-              盤點單
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">盤點日期</span>
-              <YmdPicker
-                compact
-                id="stocktake-date"
-                value={takeDate}
-                onChange={(value) => {
-                  setTakeDate(value);
-                  if (!current) return;
-                  const result = setStocktakeCountedAt({
-                    id: current.id,
-                    countedAt: inputDateToIso(value),
-                  });
-                  if (!result.ok) toast.error(result.error);
-                }}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => printSheet("blank")}>
+      <div className="border-b bg-card px-3 py-2 md:px-4 print:hidden">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h1 className="font-heading flex items-center gap-1 text-sm font-semibold">
+            <ClipboardCheck className="size-3.5" />
+            盤點單
+          </h1>
+          <span className="text-[11px] text-muted-foreground">日期</span>
+          <YmdPicker
+            tiny
+            id="stocktake-date"
+            value={takeDate}
+            onChange={(value) => {
+              setTakeDate(value);
+              if (!current) return;
+              const result = setStocktakeCountedAt({
+                id: current.id,
+                countedAt: inputDateToIso(value),
+              });
+              if (!result.ok) toast.error(result.error);
+            }}
+          />
+          <div className="ml-auto flex flex-wrap gap-1">
+            <Button size="sm" variant="outline" onClick={() => printSheet("blank")}>
               <Printer data-icon="inline-start" />
               列印空白單
             </Button>
             <Button
+              size="sm"
               variant="outline"
               onClick={() => printSheet("check")}
               disabled={!current}
@@ -356,6 +353,7 @@ export function StocktakeView() {
               列印核對
             </Button>
             <Button
+              size="sm"
               variant="outline"
               onClick={() => printSheet("audit")}
               disabled={!current}
@@ -364,15 +362,17 @@ export function StocktakeView() {
               列印抽查表
             </Button>
             {current ? (
-              <Button type="button" variant="outline" onClick={removeSheet}>
+              <Button size="sm" type="button" variant="outline" onClick={removeSheet}>
                 刪除此單
               </Button>
             ) : null}
-            <Button onClick={openMonthSheet}>開立本月盤點單</Button>
+            <Button size="sm" onClick={openMonthSheet}>
+              開立本月盤點單
+            </Button>
           </div>
         </div>
         {current ? (
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             <span>列印</span>
             <PrintChoice
               value={printSize}
@@ -402,7 +402,7 @@ export function StocktakeView() {
         ) : null}
 
         {sheets.length > 0 && (
-          <div className="mt-4 flex gap-2 overflow-x-auto print:hidden">
+          <div className="mt-1.5 flex gap-1 overflow-x-auto print:hidden">
             {sheets.map((sheet) => (
               <button
                 key={sheet.id}
@@ -413,7 +413,7 @@ export function StocktakeView() {
                   setDraftCounts({});
                 }}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-sm whitespace-nowrap",
+                  "rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
                   current?.id === sheet.id
                     ? "border-primary bg-primary text-primary-foreground"
                     : "bg-background text-muted-foreground hover:bg-muted",
@@ -432,7 +432,7 @@ export function StocktakeView() {
         )}
 
         {current && summary && (
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5 print:hidden">
+          <div className="mt-1.5 grid grid-cols-5 gap-1 print:hidden">
             <SummaryCard label="應盤" value={`${summary.total} 項`} />
             <SummaryCard label="已盤" value={`${summary.counted} 項`} />
             <SummaryCard label="未盤" value={`${summary.pending} 項`} />
@@ -449,12 +449,12 @@ export function StocktakeView() {
         )}
 
         {current && (
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row print:hidden">
+          <div className="mt-1.5 flex flex-col gap-1 sm:flex-row print:hidden">
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜尋名稱"
-              className="sm:max-w-xs"
+              className="h-7 text-xs sm:max-w-[12rem]"
             />
             <div className="flex gap-1 overflow-x-auto">
               {FILTERS.map((item) => (
@@ -463,7 +463,7 @@ export function StocktakeView() {
                   type="button"
                   onClick={() => setFilter(item.value)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-sm whitespace-nowrap",
+                    "rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap",
                     filter === item.value
                       ? "border-primary bg-primary text-primary-foreground"
                       : "bg-background text-muted-foreground hover:bg-muted",
@@ -572,8 +572,8 @@ export function StocktakeView() {
       </div>
 
       {!current ? (
-        <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-          <p className="text-2xl font-semibold">還沒有盤點單</p>
+        <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+          <p className="text-sm font-semibold">還沒有盤點單</p>
           {state.products.length > 0 ? (
             <Button onClick={openMonthSheet}>開立本月盤點單</Button>
           ) : (
@@ -890,7 +890,7 @@ function PrintChoice<T extends string | number>({
           type="button"
           onClick={() => onChange(item.value)}
           className={cn(
-            "rounded px-2 py-0.5",
+            "rounded px-1.5 py-px text-[11px]",
             value === item.value
               ? "bg-primary text-primary-foreground"
               : "hover:bg-muted",
@@ -1033,12 +1033,12 @@ function SummaryCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-background px-3 py-2",
+        "rounded-md border bg-background px-2 py-1",
         tone === "bad" && "border-destructive/40 bg-red-50 dark:bg-red-950/20",
       )}
     >
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold tabular-nums">{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className="text-xs font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
