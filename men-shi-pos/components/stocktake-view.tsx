@@ -29,9 +29,6 @@ import type { StocktakeLine } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type PrintMode = "none" | "blank" | "check" | "audit";
-type PrintSize = "small" | "mid";
-type PrintCols = 1 | 2;
-type PrintScope = "all" | "shown";
 const UNMARKED = "未註明";
 const TOTALS = "盤點總計";
 
@@ -158,9 +155,6 @@ export function StocktakeView() {
   const [binEditing, setBinEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [printMode, setPrintMode] = useState<PrintMode>("none");
-  const [printSize, setPrintSize] = useState<PrintSize>("small");
-  const [printCols, setPrintCols] = useState<PrintCols>(2);
-  const [printScope, setPrintScope] = useState<PrintScope>("all");
   const [takeDate, setTakeDate] = useState(toInputDate);
   const [newBin, setNewBin] = useState("");
   const [draftRow, setDraftRow] = useState({
@@ -202,11 +196,11 @@ export function StocktakeView() {
   const visible = useMemo(() => {
     if (!current) return [];
     return current.lines.filter((line) => {
-      if (printing && printScope === "all") return Boolean(line.bin?.trim());
+      if (printing) return Boolean(line.bin?.trim());
       if (binFilter === TOTALS) return Boolean(line.bin?.trim());
       return lineBin(line) === binFilter;
     });
-  }, [current, binFilter, printing, printScope]);
+  }, [current, binFilter, printing]);
 
   const grouped = useMemo(() => {
     const order = [...binOptions, UNMARKED];
@@ -410,35 +404,6 @@ export function StocktakeView() {
             </Button>
           </div>
         </div>
-        {current ? (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-            <span>列印</span>
-            <PrintChoice
-              value={printSize}
-              onChange={setPrintSize}
-              options={[
-                { value: "small", label: "小字" },
-                { value: "mid", label: "中字" },
-              ]}
-            />
-            <PrintChoice
-              value={printCols}
-              onChange={setPrintCols}
-              options={[
-                { value: 1, label: "一欄" },
-                { value: 2, label: "兩欄" },
-              ]}
-            />
-            <PrintChoice
-              value={printScope}
-              onChange={setPrintScope}
-              options={[
-                { value: "all", label: "全部" },
-                { value: "shown", label: "畫面上的" },
-              ]}
-            />
-          </div>
-        ) : null}
 
         {sheets.length > 0 && (
           <div className="mt-1.5 flex gap-1 overflow-x-auto print:hidden">
@@ -839,8 +804,6 @@ export function StocktakeView() {
           products={state.products}
           printBlank={printBlank}
           printAudit={printAudit}
-          printSize={printSize}
-          printCols={printCols}
         />
       )}
 
@@ -1007,36 +970,6 @@ function CabinetTotals({
   );
 }
 
-function PrintChoice<T extends string | number>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (value: T) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <span className="inline-flex rounded-md border bg-background p-0.5">
-      {options.map((item) => (
-        <button
-          key={String(item.value)}
-          type="button"
-          onClick={() => onChange(item.value)}
-          className={cn(
-            "rounded px-1.5 py-px text-[11px]",
-            value === item.value
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-muted",
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
-    </span>
-  );
-}
-
 function StocktakePrintSheet({
   shopName,
   title,
@@ -1047,8 +980,6 @@ function StocktakePrintSheet({
   products,
   printBlank,
   printAudit,
-  printSize,
-  printCols,
 }: {
   shopName: string;
   title: string;
@@ -1059,8 +990,6 @@ function StocktakePrintSheet({
   products: { id: string; price: number; cost: number }[];
   printBlank: boolean;
   printAudit: boolean;
-  printSize: PrintSize;
-  printCols: PrintCols;
 }) {
   const stats = groups.map((group) => ({
     title: group.title,
@@ -1075,12 +1004,7 @@ function StocktakePrintSheet({
     { items: 0, qty: 0, amount: 0 },
   );
   return (
-    <div
-      className={cn(
-        "stocktake-print hidden print:block",
-        printSize === "mid" && "stocktake-print-mid",
-      )}
-    >
+    <div className="stocktake-print hidden print:block">
       <p className="font-semibold">
         {shopName} · {title} · {number} · {countedOn}
       </p>
@@ -1088,7 +1012,7 @@ function StocktakePrintSheet({
         {confirmedAt ? `入帳 ${confirmedAt}` : "草稿"}
       </p>
       {groups.map((group) => {
-        const cols = chunkLines(group.lines, printCols);
+        const cols = chunkLines(group.lines, 2);
         const stat = groupStat(group.lines, products);
         return (
           <section
@@ -1098,12 +1022,7 @@ function StocktakePrintSheet({
             <h3 className="mb-1 text-center font-semibold">
               {group.title}盤點
             </h3>
-            <div
-              className={cn(
-                "st-excel-grid",
-                printCols === 1 && "st-excel-grid-one",
-              )}
-            >
+            <div className="st-excel-grid">
               {cols.map((col, colIndex) => {
                 const colStat = groupStat(col, products);
                 return (
