@@ -9,6 +9,19 @@ const nextConfig: NextConfig = {
     "*.cursor.sh",
     "*.cursor.com",
   ],
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, must-revalidate",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

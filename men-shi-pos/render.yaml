@@ -12,3 +12,5 @@ services:
         value: "20"
       - key: NODE_ENV
         value: production
+      - key: DEPLOY_MARK
+        value: "2026-10-07-this-year-red"

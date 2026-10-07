@@ -15,6 +15,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "門市 POS",
   description: "進貨、銷貨一體的收銀系統，店名與 SOP 可改給加盟門市",
