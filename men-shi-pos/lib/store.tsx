@@ -244,6 +244,14 @@ function sanitizeState(value: unknown): AppState | null {
           lines: asList<StocktakeLine>(sheet.lines).map((line) => ({
             ...line,
             bin: typeof line.bin === "string" ? line.bin : "",
+            unitPrice:
+              typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)
+                ? line.unitPrice
+                : undefined,
+            unitCost:
+              typeof line.unitCost === "number" && Number.isFinite(line.unitCost)
+                ? line.unitCost
+                : undefined,
           })),
         }),
       ),
@@ -1003,7 +1011,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       removeBin: (name) => {
         const result = removeBin(read(), name);
-        if (result.ok) commitCatalog(result.state);
+        if (!result.ok) return result;
+        const synced = syncDraftStocktakes(result.state);
+        commitWorkspace(
+          renameBinsEverywhere(
+            spreadCatalog(readWorkspace(), synced),
+            name.trim(),
+            "",
+          ),
+        );
         return result;
       },
       addExpense: (input) => {

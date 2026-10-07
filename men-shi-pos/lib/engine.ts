@@ -516,6 +516,15 @@ export function removeBin(state: AppState, name: string): EngineResult<string> {
         ...state.settings,
         bins: bins.filter((item) => item !== bin),
       },
+      products: state.products.map((item) =>
+        item.bin === bin ? { ...item, bin: "" } : item,
+      ),
+      stocktakes: (state.stocktakes ?? []).map((sheet) => ({
+        ...sheet,
+        lines: sheet.lines.map((line) =>
+          line.bin === bin ? { ...line, bin: "" } : line,
+        ),
+      })),
     },
   };
 }
@@ -1361,7 +1370,9 @@ function sameStocktakeLine(left: StocktakeLine, right: StocktakeLine) {
     left.bin === right.bin &&
     left.unit === right.unit &&
     left.bookQty === right.bookQty &&
-    left.countedQty === right.countedQty
+    left.countedQty === right.countedQty &&
+    left.unitPrice === right.unitPrice &&
+    left.unitCost === right.unitCost
   );
 }
 
@@ -1383,6 +1394,8 @@ export function linesForStocktake(
         category: product.category,
         bin: current.bin ?? "",
         unit: product.unit,
+        unitPrice: product.price,
+        unitCost: product.cost,
       };
     }
     return {
@@ -1394,11 +1407,18 @@ export function linesForStocktake(
       unit: product.unit,
       bookQty: product.stock,
       countedQty: null,
+      unitPrice: product.price,
+      unitCost: product.cost,
     };
   });
   for (const line of existing) {
     if (!catalogIds.has(line.productId) && line.countedQty != null) {
-      lines.push({ ...line, bin: line.bin ?? "" });
+      lines.push({
+        ...line,
+        bin: line.bin ?? "",
+        unitPrice: line.unitPrice ?? 0,
+        unitCost: line.unitCost ?? 0,
+      });
     }
   }
   return lines;

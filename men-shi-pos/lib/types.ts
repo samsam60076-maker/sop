@@ -143,6 +143,8 @@ export type StocktakeLine = {
   unit: Unit;
   bookQty: number;
   countedQty: number | null;
+  unitPrice?: number;
+  unitCost?: number;
 };
 
 export type Stocktake = {

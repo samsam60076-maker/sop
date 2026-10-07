@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChipListManager } from "@/components/chip-list-manager";
 import { YmdPicker } from "@/components/ymd-picker";
 import {
   monthStocktakeTitle,
@@ -25,6 +24,7 @@ import {
   formatDateYmd,
   inputDateToIso,
   toInputDate,
+  twd,
   ymdParts,
 } from "@/lib/format";
 import {
@@ -65,6 +65,22 @@ function lineStatus(line: StocktakeLine) {
   return "match";
 }
 
+function lineSellPrice(
+  line: StocktakeLine,
+  products: { id: string; price: number; cost: number }[],
+) {
+  if (typeof line.unitPrice === "number") return line.unitPrice;
+  return products.find((item) => item.id === line.productId)?.price ?? 0;
+}
+
+function lineBuyPrice(
+  line: StocktakeLine,
+  products: { id: string; price: number; cost: number }[],
+) {
+  if (typeof line.unitCost === "number") return line.unitCost;
+  return products.find((item) => item.id === line.productId)?.cost ?? 0;
+}
+
 export function StocktakeView() {
   const {
     state,
@@ -76,13 +92,13 @@ export function StocktakeView() {
     saveStocktakeBins,
     setStocktakeCountedAt,
     addBin,
-    renameBin,
     removeBin,
   } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RowFilter>("all");
   const [binFilter, setBinFilter] = useState("all");
+  const [binEditing, setBinEditing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [printMode, setPrintMode] = useState<PrintMode>("none");
   const [printSize, setPrintSize] = useState<PrintSize>("small");
@@ -90,6 +106,7 @@ export function StocktakeView() {
   const [printScope, setPrintScope] = useState<PrintScope>("all");
   const [draftCounts, setDraftCounts] = useState<Record<string, string>>({});
   const [takeDate, setTakeDate] = useState(toInputDate);
+  const [newBin, setNewBin] = useState("");
 
   const sheets = state.stocktakes ?? [];
 
@@ -414,39 +431,6 @@ export function StocktakeView() {
           </div>
         )}
 
-        <div className="mt-4 print:hidden">
-          <ChipListManager
-            label="櫃位"
-            items={normalizeSettings(state.settings).bins}
-            addPlaceholder="新櫃位"
-            onAdd={(name) => {
-              const result = addBin(name);
-              if (!result.ok) {
-                toast.error(result.error);
-                return false;
-              }
-              return true;
-            }}
-            onRename={(from, to) => {
-              const result = renameBin(from, to);
-              if (!result.ok) {
-                toast.error(result.error);
-                return false;
-              }
-              return true;
-            }}
-            onRemove={(name) => {
-              if (!window.confirm(`確定刪除櫃位「${name}」？`)) return false;
-              const result = removeBin(name);
-              if (!result.ok) {
-                toast.error(result.error);
-                return false;
-              }
-              return true;
-            }}
-          />
-        </div>
-
         {current && summary && (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5 print:hidden">
             <SummaryCard label="應盤" value={`${summary.total} 項`} />
@@ -493,7 +477,7 @@ export function StocktakeView() {
         )}
 
         {current && (
-          <div className="mt-2 flex gap-1 overflow-x-auto print:hidden">
+          <div className="mt-2 flex flex-wrap items-center gap-1 print:hidden">
             {["全部", ...binOptions, UNMARKED].map((item) => {
               const value = item === "全部" ? "all" : item;
               const count =
@@ -502,22 +486,87 @@ export function StocktakeView() {
                   : item === UNMARKED
                     ? current.lines.filter((line) => !line.bin?.trim()).length
                     : current.lines.filter((line) => line.bin === item).length;
+              const canRemove = item !== "全部" && item !== UNMARKED;
               return (
-                <button
+                <span
                   key={item}
-                  type="button"
-                  onClick={() => setBinFilter(value)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-sm whitespace-nowrap",
+                    "inline-flex items-center rounded-full border text-sm whitespace-nowrap",
                     binFilter === value
                       ? "border-primary bg-primary text-primary-foreground"
-                      : "bg-background text-muted-foreground hover:bg-muted",
+                      : "bg-background text-muted-foreground",
                   )}
                 >
-                  {item} {count}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setBinFilter(value)}
+                    className="px-2.5 py-1"
+                  >
+                    {item} {count}
+                  </button>
+                  {canRemove && binEditing ? (
+                    <button
+                      type="button"
+                      className="pr-2 text-[11px] opacity-80 hover:opacity-100"
+                      aria-label={`減少櫃位 ${item}`}
+                      onClick={() => {
+                        if (!window.confirm(`確定減少櫃位「${item}」？商品會變成未註明，可再選別櫃。`))
+                          return;
+                        const result = removeBin(item);
+                        if (!result.ok) {
+                          toast.error(result.error);
+                          return;
+                        }
+                        if (binFilter === item) setBinFilter("all");
+                        toast.success(`已減少 ${item}`);
+                      }}
+                    >
+                      減
+                    </button>
+                  ) : null}
+                </span>
               );
             })}
+            <form
+              className="inline-flex items-center gap-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const result = addBin(newBin);
+                if (!result.ok) {
+                  toast.error(result.error);
+                  return;
+                }
+                setBinFilter(result.data);
+                setNewBin("");
+                toast.success(`已新增 ${result.data}`);
+              }}
+            >
+              <input
+                value={newBin}
+                onChange={(event) => setNewBin(event.target.value)}
+                placeholder="第三櫃冷凍冰箱"
+                className="h-7 w-36 rounded-full border bg-background px-2 text-xs"
+                aria-label="新櫃位名稱"
+              />
+              <button
+                type="submit"
+                className="h-7 rounded-full border bg-primary px-2.5 text-xs text-primary-foreground"
+              >
+                新增
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => setBinEditing((open) => !open)}
+              className={cn(
+                "h-7 rounded-full border px-2.5 text-xs",
+                binEditing
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground",
+              )}
+            >
+              {binEditing ? "完成" : "減少"}
+            </button>
           </div>
         )}
       </div>
@@ -541,10 +590,14 @@ export function StocktakeView() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">項</TableHead>
-                <TableHead>商品名稱</TableHead>
+                <TableHead>商品</TableHead>
+                <TableHead className="w-28">日期</TableHead>
                 <TableHead className="w-40">在哪一櫃</TableHead>
                 <TableHead className="text-right">帳面</TableHead>
-                <TableHead className="text-right">實盤</TableHead>
+                <TableHead className="text-right">數量</TableHead>
+                <TableHead className="text-right">售價</TableHead>
+                <TableHead className="text-right">批價</TableHead>
+                <TableHead className="text-right">金額</TableHead>
                 <TableHead className="text-right">差異</TableHead>
                 <TableHead className={printAudit ? "print:hidden" : ""}>
                   核對
@@ -555,7 +608,7 @@ export function StocktakeView() {
               <TableBody key={group.title}>
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={11}
                     className="bg-muted/60 font-semibold"
                   >
                     {group.title}
@@ -565,12 +618,24 @@ export function StocktakeView() {
                         (sum, line) => sum + line.bookQty,
                         0,
                       )}
+                      {" · 售價 "}
+                      {twd(
+                        group.lines.reduce((sum, line) => {
+                          const qty = line.countedQty ?? line.bookQty;
+                          return (
+                            sum + qty * lineSellPrice(line, state.products)
+                          );
+                        }, 0),
+                      )}
                     </span>
                   </TableCell>
                 </TableRow>
                 {group.lines.map((line, index) => {
                   const diff = lineDiff(line);
                   const status = lineStatus(line);
+                  const sell = lineSellPrice(line, state.products);
+                  const buy = lineBuyPrice(line, state.products);
+                  const qty = line.countedQty ?? line.bookQty;
                   return (
                     <TableRow
                       key={line.productId}
@@ -588,6 +653,9 @@ export function StocktakeView() {
                         <div className="text-xs text-muted-foreground">
                           {line.sku} · {line.unit}
                         </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                        {formatDateYmd(stocktakeCountedAt(current))}
                       </TableCell>
                       <TableCell>
                         {printBlank ? (
@@ -637,7 +705,7 @@ export function StocktakeView() {
                               }
                             }}
                             placeholder="打數量"
-                            aria-label={`${line.name} 實盤`}
+                            aria-label={`${line.name} 數量`}
                             className={cn(
                               "h-11 w-24 rounded-md border bg-background px-2 text-right text-base tabular-nums outline-none focus:border-primary",
                               "print:h-8 print:border-foreground",
@@ -646,6 +714,15 @@ export function StocktakeView() {
                             )}
                           />
                         )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {twd(sell)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {twd(buy)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {twd(qty * sell)}
                       </TableCell>
                       <TableCell
                         className={cn(
@@ -698,6 +775,7 @@ export function StocktakeView() {
             current.confirmedAt ? formatDateTime(current.confirmedAt) : ""
           }
           groups={grouped}
+          products={state.products}
           printBlank={printBlank}
           printAudit={printAudit}
           printSize={printSize}
@@ -832,6 +910,7 @@ function StocktakePrintSheet({
   countedOn,
   confirmedAt,
   groups,
+  products,
   printBlank,
   printAudit,
   printSize,
@@ -843,6 +922,7 @@ function StocktakePrintSheet({
   countedOn: string;
   confirmedAt: string;
   groups: { title: string; lines: StocktakeLine[] }[];
+  products: { id: string; price: number; cost: number }[];
   printBlank: boolean;
   printAudit: boolean;
   printSize: PrintSize;
@@ -884,20 +964,24 @@ function StocktakePrintSheet({
             <ul>
               {group.lines.map((line, index) => {
                 const diff = lineDiff(line);
+                const sell = lineSellPrice(line, products);
+                const buy = lineBuyPrice(line, products);
+                const qty = line.countedQty ?? line.bookQty;
                 return (
                   <li
                     key={line.productId}
                     className="stocktake-print-line grid items-center gap-x-1 border-b border-foreground/25 py-px"
                     style={{
                       gridTemplateColumns: printAudit
-                        ? "1.15rem minmax(0,1fr) 1.5rem 2.1rem 1.4rem"
-                        : "1.15rem minmax(0,1fr) 2.4rem 1.5rem 2.1rem 1.4rem",
+                        ? "1.15rem minmax(0,1fr) 3.4rem 1.5rem 2.1rem 2rem 2rem 2.2rem 1.4rem"
+                        : "1.15rem minmax(0,1fr) 3.4rem 2.2rem 1.5rem 2.1rem 2rem 2rem 2.2rem 1.4rem",
                     }}
                   >
                     <span className="tabular-nums text-muted-foreground">
                       {index + 1}
                     </span>
                     <span className="min-w-0 truncate">{line.name}</span>
+                    <span className="truncate tabular-nums">{countedOn}</span>
                     {printAudit ? null : (
                       <span className="min-w-0 truncate">
                         {line.bin?.trim() || "—"}
@@ -908,6 +992,11 @@ function StocktakePrintSheet({
                     </span>
                     <span className="min-h-[1.1em] border-b border-foreground text-right tabular-nums">
                       {printBlank ? "" : (line.countedQty ?? "")}
+                    </span>
+                    <span className="text-right tabular-nums">{twd(sell)}</span>
+                    <span className="text-right tabular-nums">{twd(buy)}</span>
+                    <span className="text-right tabular-nums">
+                      {printBlank ? "" : twd(qty * sell)}
                     </span>
                     <span className="text-right tabular-nums">
                       {printBlank || diff == null
