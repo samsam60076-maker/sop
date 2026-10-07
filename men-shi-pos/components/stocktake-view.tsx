@@ -237,16 +237,15 @@ export function StocktakeView() {
     setSelectedId(result.data.id);
     setReviewing(false);
     setBinFilter(binOptions[0] ?? TOTALS);
-    setDraftRow({ name: "", date: takeDate, qty: "", price: "" });
+    setDraftRow({ name: "", date: "", qty: "", price: "" });
     toast.success(`已開立 ${result.data.number}，選櫃子打名稱`);
   }
 
-  function lineDateValue(line: StocktakeLine) {
-    if (line.countedOn && /^\d{4}-\d{2}-\d{2}$/.test(line.countedOn)) {
-      return line.countedOn;
-    }
-    if (line.countedOn) return toInputDate(new Date(line.countedOn));
-    return takeDate;
+  function lineExpiryValue(line: StocktakeLine) {
+    const raw = line.expiresOn || line.countedOn || "";
+    if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    if (raw) return toInputDate(new Date(raw));
+    return "";
   }
 
   function saveLine(
@@ -267,7 +266,7 @@ export function StocktakeView() {
       lineId,
       bin: activeBin,
       name: next.name,
-      countedOn: next.date || takeDate,
+      expiresOn: next.date,
       countedQty: qtyRaw === "" ? null : Number(qtyRaw),
       unitPrice: priceRaw === "" ? undefined : Number(priceRaw),
     });
@@ -325,7 +324,7 @@ export function StocktakeView() {
             <ClipboardCheck className="size-3.5" />
             盤點單
           </h1>
-          <span className="text-[11px] text-muted-foreground">日期</span>
+          <span className="text-[11px] text-muted-foreground">盤點日</span>
           <YmdPicker
             tiny
             id="stocktake-date"
@@ -542,7 +541,7 @@ export function StocktakeView() {
                   品項
                 </th>
                 <th className="w-36 px-2 py-1.5 text-left text-xs font-semibold">
-                  日期
+                  保存期限
                 </th>
                 <th className="w-20 px-2 py-1.5 text-right text-xs font-semibold">
                   數量
@@ -574,7 +573,7 @@ export function StocktakeView() {
                         onBlur={(event) =>
                           saveLine(key, {
                             name: event.target.value,
-                            date: lineDateValue(line),
+                            date: lineExpiryValue(line),
                             qty: line.countedQty == null ? "" : String(line.countedQty),
                             price: String(sell),
                           })
@@ -586,8 +585,10 @@ export function StocktakeView() {
                     <td className="px-2 py-1">
                       <YmdPicker
                         tiny
+                        allowEmpty
+                        futureYears
                         id={`stocktake-line-date-${key}`}
-                        value={lineDateValue(line)}
+                        value={lineExpiryValue(line)}
                         onChange={(value) =>
                           saveLine(key, {
                             name: line.name,
@@ -606,7 +607,7 @@ export function StocktakeView() {
                         onBlur={(event) =>
                           saveLine(key, {
                             name: line.name,
-                            date: lineDateValue(line),
+                            date: lineExpiryValue(line),
                             qty: event.target.value,
                             price: String(sell),
                           })
@@ -623,7 +624,7 @@ export function StocktakeView() {
                         onBlur={(event) =>
                           saveLine(key, {
                             name: line.name,
-                            date: lineDateValue(line),
+                            date: lineExpiryValue(line),
                             qty: line.countedQty == null ? "" : String(line.countedQty),
                             price: event.target.value,
                           })
@@ -675,7 +676,7 @@ export function StocktakeView() {
                         );
                         const next = {
                           ...draftRow,
-                          date: draftRow.date || takeDate,
+                          date: draftRow.date,
                           price:
                             draftRow.price ||
                             (hit ? String(hit.price) : draftRow.price),
@@ -684,7 +685,7 @@ export function StocktakeView() {
                         if (result?.ok) {
                           setDraftRow({
                             name: "",
-                            date: takeDate,
+                            date: "",
                             qty: "",
                             price: "",
                           });
@@ -701,8 +702,10 @@ export function StocktakeView() {
                   <td className="px-2 py-1">
                     <YmdPicker
                       tiny
+                      allowEmpty
+                      futureYears
                       id="stocktake-new-date"
-                      value={draftRow.date || takeDate}
+                      value={draftRow.date}
                       onChange={(value) =>
                         setDraftRow((row) => ({ ...row, date: value }))
                       }
@@ -766,7 +769,7 @@ export function StocktakeView() {
             ))}
           </datalist>
           <p className="px-3 py-2 text-[11px] text-muted-foreground">
-            在這一櫃打名稱、日期、數量、價錢。打好各櫃後，按「盤點總計」看每一表的金額。
+            在這一櫃打名稱、保存期限、數量、價錢。打好各櫃後，按「盤點總計」看每一表的金額。
           </p>
         </div>
       )}
@@ -1046,6 +1049,7 @@ function StocktakePrintSheet({
                     <thead>
                       <tr>
                         <th>品項</th>
+                        <th>保存期限</th>
                         <th className="num">數量</th>
                         <th className="num">金額</th>
                         <th className="num">總計</th>
@@ -1056,8 +1060,11 @@ function StocktakePrintSheet({
                         const sell = lineSellPrice(line, products);
                         const qty = lineQty(line);
                         return (
-                          <tr key={line.productId}>
+                          <tr key={line.productId || line.id}>
                             <td>{line.name}</td>
+                            <td>
+                              {line.expiresOn || line.countedOn || ""}
+                            </td>
                             <td className="num">
                               {printBlank ? "" : qty}
                             </td>
@@ -1072,6 +1079,7 @@ function StocktakePrintSheet({
                     <tfoot>
                       <tr>
                         <td>合計</td>
+                        <td />
                         <td className="num">
                           {printBlank ? "" : colStat.qty}
                         </td>

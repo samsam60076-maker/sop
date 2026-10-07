@@ -268,6 +268,12 @@ function sanitizeState(value: unknown): AppState | null {
               typeof line.countedOn === "string" && line.countedOn
                 ? line.countedOn
                 : undefined,
+            expiresOn:
+              typeof line.expiresOn === "string" && line.expiresOn
+                ? line.expiresOn
+                : typeof line.countedOn === "string" && line.countedOn
+                  ? line.countedOn
+                  : undefined,
           })),
         }),
       ),

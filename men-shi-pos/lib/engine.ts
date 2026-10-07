@@ -1374,7 +1374,8 @@ function sameStocktakeLine(left: StocktakeLine, right: StocktakeLine) {
     left.countedQty === right.countedQty &&
     left.unitPrice === right.unitPrice &&
     left.unitCost === right.unitCost &&
-    left.countedOn === right.countedOn
+    left.countedOn === right.countedOn &&
+    left.expiresOn === right.expiresOn
   );
 }
 
@@ -1593,6 +1594,7 @@ export function upsertStocktakeLine(
     bin: string;
     name: string;
     countedOn?: string;
+    expiresOn?: string;
     countedQty?: number | null;
     unitPrice?: number;
   },
@@ -1616,6 +1618,10 @@ export function upsertStocktakeLine(
       : Math.max(0, Math.round(input.unitPrice));
   const product = matchStocktakeProduct(name, state.products);
   const countedOn = input.countedOn?.trim() || undefined;
+  const expiresOn =
+    input.expiresOn !== undefined
+      ? input.expiresOn.trim() || undefined
+      : undefined;
 
   let found = false;
   const lines = current.lines.map((line) => {
@@ -1634,6 +1640,8 @@ export function upsertStocktakeLine(
       unitPrice: price ?? product?.price ?? line.unitPrice,
       unitCost: product?.cost ?? line.unitCost,
       countedOn: countedOn ?? line.countedOn,
+      expiresOn:
+        input.expiresOn !== undefined ? expiresOn : line.expiresOn,
     };
   });
 
@@ -1651,6 +1659,7 @@ export function upsertStocktakeLine(
       unitPrice: price ?? product?.price ?? 0,
       unitCost: product?.cost ?? 0,
       countedOn,
+      expiresOn,
     });
   }
 

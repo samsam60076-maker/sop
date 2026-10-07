@@ -32,16 +32,23 @@ export function YmdPicker({
   onChange,
   compact = false,
   tiny = false,
+  allowEmpty = false,
+  futureYears = false,
 }: {
   id?: string;
   value: string;
   onChange: (value: string) => void;
   compact?: boolean;
   tiny?: boolean;
+  allowEmpty?: boolean;
+  futureYears?: boolean;
 }) {
+  const empty = allowEmpty && !value;
   const current = parse(value);
   const thisYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, index) => thisYear - 4 + index);
+  const years = futureYears
+    ? Array.from({ length: 8 }, (_, index) => thisYear - 1 + index)
+    : Array.from({ length: 6 }, (_, index) => thisYear - 4 + index);
   const maxDay = daysInMonth(current.year, current.month);
   const small = compact || tiny;
   const box = tiny
@@ -60,12 +67,18 @@ export function YmdPicker({
             box,
             tiny ? "w-16" : compact ? "w-[4.75rem]" : "w-[6.5rem]",
           )}
-          value={current.year}
-          onChange={(event) =>
-            onChange(join(Number(event.target.value), current.month, current.day))
-          }
+          value={empty ? "" : current.year}
+          onChange={(event) => {
+            const year = Number(event.target.value);
+            if (!year) {
+              onChange("");
+              return;
+            }
+            onChange(join(year, current.month, current.day));
+          }}
           aria-label="年"
         >
+          {allowEmpty ? <option value="">—</option> : null}
           {years.map((year) => (
             <option key={year} value={year}>
               {year}
@@ -78,12 +91,18 @@ export function YmdPicker({
         <select
           name={id ? `${id}-month` : "sale-month"}
           className={cn(box, tiny ? "w-9" : compact ? "w-11" : "w-20")}
-          value={current.month}
-          onChange={(event) =>
-            onChange(join(current.year, Number(event.target.value), current.day))
-          }
+          value={empty ? "" : current.month}
+          onChange={(event) => {
+            const month = Number(event.target.value);
+            if (!month) {
+              onChange("");
+              return;
+            }
+            onChange(join(current.year, month, current.day));
+          }}
           aria-label="月"
         >
+          {allowEmpty ? <option value="">—</option> : null}
           {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
             <option key={month} value={month}>
               {month}
@@ -96,12 +115,18 @@ export function YmdPicker({
         <select
           name={id ? `${id}-day` : "sale-day"}
           className={cn(box, tiny ? "w-9" : compact ? "w-11" : "w-20")}
-          value={Math.min(current.day, maxDay)}
-          onChange={(event) =>
-            onChange(join(current.year, current.month, Number(event.target.value)))
-          }
+          value={empty ? "" : Math.min(current.day, maxDay)}
+          onChange={(event) => {
+            const day = Number(event.target.value);
+            if (!day) {
+              onChange("");
+              return;
+            }
+            onChange(join(current.year, current.month, day));
+          }}
           aria-label="日"
         >
+          {allowEmpty ? <option value="">—</option> : null}
           {Array.from({ length: maxDay }, (_, index) => index + 1).map((day) => (
             <option key={day} value={day}>
               {day}

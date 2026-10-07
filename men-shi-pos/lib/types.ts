@@ -147,6 +147,7 @@ export type StocktakeLine = {
   unitPrice?: number;
   unitCost?: number;
   countedOn?: string;
+  expiresOn?: string;
 };
 
 export type Stocktake = {
