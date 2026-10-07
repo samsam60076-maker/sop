@@ -383,10 +383,6 @@ export function StocktakeView() {
             }}
           />
           <div className="ml-auto flex flex-wrap gap-1">
-            <Button size="sm" variant="outline" onClick={() => printSheet("blank")}>
-              <Printer data-icon="inline-start" />
-              列印空白單
-            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -394,16 +390,7 @@ export function StocktakeView() {
               disabled={!current}
             >
               <Printer data-icon="inline-start" />
-              列印核對
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => printSheet("audit")}
-              disabled={!current}
-            >
-              <Printer data-icon="inline-start" />
-              列印抽查表
+              列印當月盤點表
             </Button>
             {current ? (
               <Button size="sm" type="button" variant="outline" onClick={removeSheet}>
@@ -898,7 +885,7 @@ export function StocktakeView() {
       {current && (
         <StocktakePrintSheet
           shopName={displayShopName(normalizeSettings(state.settings))}
-          title={printAudit ? "冰箱抽查表" : current.title}
+          title={`${current.title}盤點表`}
           number={current.number}
           countedOn={formatDateYmd(stocktakeCountedAt(current))}
           confirmedAt={
@@ -1078,7 +1065,7 @@ function StocktakePrintSheet({
       )}
     >
       <p className="font-semibold">
-        {shopName} · {printAudit ? "冰箱抽查表" : title} · {number} · {countedOn}
+        {shopName} · {title} · {number} · {countedOn}
       </p>
       <p className="text-[0.95em] text-muted-foreground">
         {confirmedAt ? `入帳 ${confirmedAt}` : "草稿"}
