@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ClipboardCheck, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,10 +47,13 @@ function lineStatus(line: StocktakeLine) {
 
 function lineSellPrice(
   line: StocktakeLine,
-  products: { id: string; price: number; cost: number }[],
+  products: { id: string; name?: string; price: number; cost: number }[],
 ) {
-  if (typeof line.unitPrice === "number") return line.unitPrice;
-  return products.find((item) => item.id === line.productId)?.price ?? 0;
+  const byId = products.find((item) => item.id && item.id === line.productId);
+  if (byId) return byId.price;
+  const byName = products.find((item) => item.name === line.name);
+  if (byName) return byName.price;
+  return typeof line.unitPrice === "number" ? line.unitPrice : 0;
 }
 
 function lineBin(line: StocktakeLine) {
@@ -58,7 +61,7 @@ function lineBin(line: StocktakeLine) {
 }
 
 function lineQty(line: StocktakeLine) {
-  return line.countedQty ?? line.bookQty;
+  return line.countedQty ?? 0;
 }
 
 function lineAmount(
@@ -146,6 +149,30 @@ function expiryThisYearClass(raw: string) {
     : "bg-background";
 }
 
+type StCol = "name" | "date" | "qty";
+
+function focusStocktakeCell(col: StCol, row: number) {
+  let done = false;
+  const run = () => {
+    if (done) return true;
+    const el = document.querySelector<HTMLInputElement>(
+      `input[data-st-col="${col}"][data-st-row="${row}"]`,
+    );
+    if (!el || el.disabled) return false;
+    el.focus();
+    el.select();
+    done = true;
+    return true;
+  };
+  if (run()) return;
+  requestAnimationFrame(() => {
+    if (run()) return;
+    window.setTimeout(run, 0);
+    window.setTimeout(run, 40);
+    window.setTimeout(run, 100);
+  });
+}
+
 function chunkLines<T>(list: T[], cols: number): T[][] {
   if (cols <= 1) return [list];
   if (list.length === 0) return Array.from({ length: cols }, () => []);
@@ -179,8 +206,8 @@ export function StocktakeView() {
     name: "",
     date: "",
     qty: "",
-    price: "",
   });
+  const skipDraftBlurRef = useRef(false);
 
   const sheets = state.stocktakes ?? [];
 
@@ -293,12 +320,17 @@ export function StocktakeView() {
     setSelectedId(result.data.id);
     setReviewing(false);
     setBinFilter(binOptions[0] ?? TOTALS);
-    setDraftRow({ name: "", date: "", qty: "", price: "" });
+    setDraftRow({ name: "", date: "", qty: "" });
     toast.success(`已開立 ${result.data.number}，選櫃子打名稱`);
   }
 
   function lineExpiryValue(line: StocktakeLine) {
     return displayExpiry(line.expiresOn || "");
+  }
+
+  function catalogPrice(name: string) {
+    const hit = state.products.find((item) => item.name === name.trim());
+    return hit?.price;
   }
 
   function saveLine(
@@ -307,13 +339,11 @@ export function StocktakeView() {
       name: string;
       date: string;
       qty: string;
-      price: string;
     },
   ) {
     if (!current || locked || !activeBin) return;
     if (!next.name.trim()) return;
     const qtyRaw = next.qty.trim();
-    const priceRaw = next.price.trim();
     const result = upsertStocktakeLine({
       id: current.id,
       lineId,
@@ -321,10 +351,39 @@ export function StocktakeView() {
       name: next.name,
       expiresOn: parseExpiryInput(next.date),
       countedQty: qtyRaw === "" ? null : Number(qtyRaw),
-      unitPrice: priceRaw === "" ? undefined : Number(priceRaw),
+      unitPrice: catalogPrice(next.name),
     });
     if (!result.ok) toast.error(result.error);
     return result;
+  }
+
+  function saveDraftAndClear() {
+    if (!draftRow.name.trim()) return false;
+    skipDraftBlurRef.current = true;
+    const result = saveLine(undefined, draftRow);
+    if (result?.ok) {
+      setDraftRow({ name: "", date: "", qty: "" });
+      window.setTimeout(() => {
+        skipDraftBlurRef.current = false;
+      }, 200);
+      return true;
+    }
+    skipDraftBlurRef.current = false;
+    return false;
+  }
+
+  function enterNext(
+    col: StCol,
+    row: number,
+    save: () => void,
+  ) {
+    return (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      save();
+      focusStocktakeCell(col, row + 1);
+    };
   }
 
   function parkSheet() {
@@ -332,7 +391,7 @@ export function StocktakeView() {
     if (draftRow.name.trim()) {
       const result = saveLine(undefined, draftRow);
       if (result?.ok) {
-        setDraftRow({ name: "", date: "", qty: "", price: "" });
+        setDraftRow({ name: "", date: "", qty: "" });
       }
     }
     toast.success("已暫存。這張單還在，數量可以晚點再填。");
@@ -478,7 +537,9 @@ export function StocktakeView() {
                     onClick={() => setBinFilter(value)}
                     className="px-2.5 py-1"
                   >
-                    {item === TOTALS ? TOTALS : `${item} ${count}`}
+                    {item === TOTALS
+                      ? `${TOTALS} ${twd(cabinetGrand.amount)}`
+                      : `${item} ${count}`}
                   </button>
                   {canRemove && binEditing ? (
                     <button
@@ -596,6 +657,19 @@ export function StocktakeView() {
                 const qty = line.countedQty ?? 0;
                 const key = stocktakeLineKey(line);
                 const expiryRaw = line.expiresOn || "";
+                const qtyText =
+                  line.countedQty == null ? "" : String(line.countedQty);
+                function persist(patch: {
+                  name?: string;
+                  date?: string;
+                  qty?: string;
+                }) {
+                  saveLine(key, {
+                    name: patch.name ?? line.name,
+                    date: patch.date ?? lineExpiryValue(line),
+                    qty: patch.qty ?? qtyText,
+                  });
+                }
                 return (
                   <tr key={key} className="border-b border-dashed">
                     <td className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
@@ -603,34 +677,36 @@ export function StocktakeView() {
                     </td>
                     <td className="px-2 py-1">
                       <input
+                        data-st-col="name"
+                        data-st-row={index}
                         list="stocktake-product-names"
                         defaultValue={line.name}
                         disabled={locked}
-                        onBlur={(event) =>
-                          saveLine(key, {
-                            name: event.target.value,
-                            date: lineExpiryValue(line),
-                            qty: line.countedQty == null ? "" : String(line.countedQty),
-                            price: String(sell),
-                          })
-                        }
+                        autoComplete="off"
+                        enterKeyHint="next"
+                        onBlur={(event) => persist({ name: event.target.value })}
+                        onKeyDown={enterNext("name", index, () => {
+                          const el = document.activeElement as HTMLInputElement;
+                          persist({ name: el?.value ?? line.name });
+                        })}
                         className="h-8 w-full rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
                         aria-label={`${activeBin} 品項`}
                       />
                     </td>
                     <td className="px-2 py-1">
                       <input
+                        data-st-col="date"
+                        data-st-row={index}
                         inputMode="numeric"
                         defaultValue={lineExpiryValue(line)}
                         disabled={locked}
-                        onBlur={(event) =>
-                          saveLine(key, {
-                            name: line.name,
-                            date: event.target.value,
-                            qty: line.countedQty == null ? "" : String(line.countedQty),
-                            price: String(sell),
-                          })
-                        }
+                        autoComplete="off"
+                        enterKeyHint="next"
+                        onBlur={(event) => persist({ date: event.target.value })}
+                        onKeyDown={enterNext("date", index, () => {
+                          const el = document.activeElement as HTMLInputElement;
+                          persist({ date: el?.value ?? lineExpiryValue(line) });
+                        })}
                         className={cn(
                           "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
                           expiryThisYearClass(expiryRaw),
@@ -640,37 +716,24 @@ export function StocktakeView() {
                     </td>
                     <td className="px-2 py-1">
                       <input
+                        data-st-col="qty"
+                        data-st-row={index}
                         inputMode="numeric"
-                        defaultValue={line.countedQty == null ? "" : String(line.countedQty)}
+                        defaultValue={qtyText}
                         disabled={locked}
-                        onBlur={(event) =>
-                          saveLine(key, {
-                            name: line.name,
-                            date: lineExpiryValue(line),
-                            qty: event.target.value,
-                            price: String(sell),
-                          })
-                        }
+                        autoComplete="off"
+                        enterKeyHint="next"
+                        onBlur={(event) => persist({ qty: event.target.value })}
+                        onKeyDown={enterNext("qty", index, () => {
+                          const el = document.activeElement as HTMLInputElement;
+                          persist({ qty: el?.value ?? qtyText });
+                        })}
                         className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
                         aria-label={`${line.name} 數量`}
                       />
                     </td>
-                    <td className="px-2 py-1">
-                      <input
-                        inputMode="numeric"
-                        defaultValue={sell ? String(sell) : ""}
-                        disabled={locked}
-                        onBlur={(event) =>
-                          saveLine(key, {
-                            name: line.name,
-                            date: lineExpiryValue(line),
-                            qty: line.countedQty == null ? "" : String(line.countedQty),
-                            price: event.target.value,
-                          })
-                        }
-                        className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
-                        aria-label={`${line.name} 金額`}
-                      />
+                    <td className="px-2 py-1 text-right text-sm tabular-nums text-muted-foreground">
+                      {sell ? twd(sell) : ""}
                     </td>
                     <td className="px-2 py-1 text-right text-sm tabular-nums">
                       {twd(qty * sell)}
@@ -679,6 +742,7 @@ export function StocktakeView() {
                       {locked ? null : (
                         <button
                           type="button"
+                          tabIndex={-1}
                           className="text-xs text-muted-foreground hover:text-destructive"
                           onClick={() => {
                             const result = removeStocktakeLine({
@@ -702,49 +766,41 @@ export function StocktakeView() {
                   </td>
                   <td className="px-2 py-1">
                     <input
+                      data-st-col="name"
+                      data-st-row={visible.length}
                       list="stocktake-product-names"
                       value={draftRow.name}
                       placeholder="打名稱"
+                      autoComplete="off"
+                      enterKeyHint="next"
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, name: event.target.value }))
                       }
                       onBlur={() => {
+                        if (skipDraftBlurRef.current) return;
                         if (!draftRow.name.trim()) return;
-                        const hit = state.products.find(
-                          (item) => item.name === draftRow.name.trim(),
-                        );
-                        const next = {
-                          ...draftRow,
-                          date: draftRow.date,
-                          price:
-                            draftRow.price ||
-                            (hit ? String(hit.price) : draftRow.price),
-                        };
-                        const result = saveLine(undefined, next);
+                        const result = saveLine(undefined, draftRow);
                         if (result?.ok) {
-                          setDraftRow({
-                            name: "",
-                            date: "",
-                            qty: "",
-                            price: "",
-                          });
+                          setDraftRow({ name: "", date: "", qty: "" });
                         }
                       }}
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter") return;
-                        event.currentTarget.blur();
-                      }}
+                      onKeyDown={enterNext("name", visible.length, saveDraftAndClear)}
                       className="h-8 w-full rounded border bg-background px-1.5 text-sm outline-none focus:border-primary"
                       aria-label={`${activeBin} 新品項`}
                     />
                   </td>
                   <td className="px-2 py-1">
                     <input
+                      data-st-col="date"
+                      data-st-row={visible.length}
                       inputMode="numeric"
                       value={draftRow.date}
+                      autoComplete="off"
+                      enterKeyHint="next"
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, date: event.target.value }))
                       }
+                      onKeyDown={enterNext("date", visible.length, saveDraftAndClear)}
                       className={cn(
                         "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
                         expiryThisYearClass(draftRow.date),
@@ -754,31 +810,30 @@ export function StocktakeView() {
                   </td>
                   <td className="px-2 py-1">
                     <input
+                      data-st-col="qty"
+                      data-st-row={visible.length}
                       inputMode="numeric"
                       value={draftRow.qty}
                       placeholder="數量"
+                      autoComplete="off"
+                      enterKeyHint="next"
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, qty: event.target.value }))
                       }
+                      onKeyDown={enterNext("qty", visible.length, saveDraftAndClear)}
                       className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
                       aria-label="新數量"
                     />
                   </td>
-                  <td className="px-2 py-1">
-                    <input
-                      inputMode="numeric"
-                      value={draftRow.price}
-                      placeholder="價錢"
-                      onChange={(event) =>
-                        setDraftRow((row) => ({ ...row, price: event.target.value }))
-                      }
-                      className="h-8 w-full rounded border bg-background px-1.5 text-right text-sm tabular-nums outline-none focus:border-primary"
-                      aria-label="新金額"
-                    />
+                  <td className="px-2 py-1 text-right text-sm tabular-nums text-muted-foreground">
+                    {catalogPrice(draftRow.name)
+                      ? twd(catalogPrice(draftRow.name) ?? 0)
+                      : ""}
                   </td>
                   <td className="px-2 py-1 text-right text-sm tabular-nums text-muted-foreground">
                     {twd(
-                      (Number(draftRow.qty) || 0) * (Number(draftRow.price) || 0),
+                      (Number(draftRow.qty) || 0) *
+                        (catalogPrice(draftRow.name) ?? 0),
                     )}
                   </td>
                   <td />
