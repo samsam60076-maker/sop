@@ -462,29 +462,6 @@ export function StocktakeView() {
           </div>
         )}
 
-        {current && summary && (
-          <div className="mt-1.5 grid grid-cols-5 gap-1 print:hidden">
-            <SummaryCard label="應盤" value={`${summary.total} 項`} />
-            <SummaryCard label="已盤" value={`${summary.counted} 項`} />
-            <SummaryCard label="未盤" value={`${summary.pending} 項`} />
-            <SummaryCard
-              label="缺失"
-              value={`${summary.missing} 項 / ${summary.missingQty} 件`}
-              tone={summary.missing > 0 ? "bad" : undefined}
-            />
-            <SummaryCard
-              label="盤盈"
-              value={`${summary.surplus} 項 / ${summary.surplusQty} 件`}
-            />
-          </div>
-        )}
-
-        {current && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground print:hidden">
-            先把商品選到櫃子，再一櫃一櫃打數量。最下面是各櫃盤點總計。
-          </p>
-        )}
-
         {current && (
           <div className="mt-1.5 flex flex-col gap-1 sm:flex-row print:hidden">
             <Input
@@ -1195,28 +1172,6 @@ function StocktakePrintSheet({
           ? "抽查人：__________　覆核：__________　日期：__________"
           : "盤點人：__________　覆核：__________　日期：__________"}
       </p>
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "bad";
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-md border bg-background px-2 py-1",
-        tone === "bad" && "border-destructive/40 bg-red-50 dark:bg-red-950/20",
-      )}
-    >
-      <p className="text-[10px] text-muted-foreground">{label}</p>
-      <p className="text-xs font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
