@@ -20,10 +20,8 @@ import {
   ymdParts,
 } from "@/lib/format";
 import {
-  contrastText,
   displayShopName,
   listedBins,
-  normalizeHexColor,
   normalizeSettings,
 } from "@/lib/shop";
 import { useStore } from "@/lib/store";
@@ -136,32 +134,16 @@ function displayExpiry(raw: string) {
   return `${String(year).slice(-2)}${month}${day}`;
 }
 
-type ExpiryTone = "" | "soon" | "later";
-
-function expiryTone(raw: string, today = new Date()): ExpiryTone {
+function isThisYearExpiry(raw: string, today = new Date()) {
   const iso = parseExpiryInput(raw, today);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
-  const year = Number(iso.slice(0, 4));
-  return year <= today.getFullYear() ? "soon" : "later";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  return Number(iso.slice(0, 4)) === today.getFullYear();
 }
 
-function expiryFill(
-  tone: ExpiryTone,
-  soonColor: string,
-  laterColor: string,
-) {
-  if (tone === "soon") return soonColor;
-  if (tone === "later") return laterColor;
-  return "";
-}
-
-function expiryFieldStyle(fill: string): { backgroundColor: string; color: string; borderColor: string } | undefined {
-  if (!fill) return undefined;
-  return {
-    backgroundColor: fill,
-    color: contrastText(fill),
-    borderColor: fill,
-  };
+function expiryThisYearClass(raw: string) {
+  return isThisYearExpiry(raw)
+    ? "border-red-500 bg-red-100 font-semibold text-red-800"
+    : "bg-background";
 }
 
 function chunkLines<T>(list: T[], cols: number): T[][] {
@@ -185,7 +167,6 @@ export function StocktakeView() {
     setStocktakeCountedAt,
     addBin,
     removeBin,
-    updateSettings,
   } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [binFilter, setBinFilter] = useState("");
@@ -222,8 +203,6 @@ export function StocktakeView() {
 
   const settings = normalizeSettings(state.settings);
   const binOptions = listedBins(settings);
-  const soonColor = settings.expirySoonColor;
-  const laterColor = settings.expiryLaterColor;
   const printing = printMode !== "none";
   const printBlank = printMode === "blank";
   const printAudit = printMode === "audit";
@@ -616,8 +595,7 @@ export function StocktakeView() {
                 const sell = lineSellPrice(line, state.products);
                 const qty = line.countedQty ?? 0;
                 const key = stocktakeLineKey(line);
-                const tone = expiryTone(line.expiresOn || "");
-                const fill = expiryFill(tone, soonColor, laterColor);
+                const expiryRaw = line.expiresOn || "";
                 return (
                   <tr key={key} className="border-b border-dashed">
                     <td className="px-2 py-1 text-xs tabular-nums text-muted-foreground">
@@ -645,7 +623,6 @@ export function StocktakeView() {
                         inputMode="numeric"
                         defaultValue={lineExpiryValue(line)}
                         disabled={locked}
-                        placeholder="271010"
                         onBlur={(event) =>
                           saveLine(key, {
                             name: line.name,
@@ -654,8 +631,10 @@ export function StocktakeView() {
                             price: String(sell),
                           })
                         }
-                        style={expiryFieldStyle(fill)}
-                        className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
+                        className={cn(
+                          "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
+                          expiryThisYearClass(expiryRaw),
+                        )}
                         aria-label={`${line.name} 保存期限`}
                       />
                     </td>
@@ -763,14 +742,13 @@ export function StocktakeView() {
                     <input
                       inputMode="numeric"
                       value={draftRow.date}
-                      placeholder="271010"
                       onChange={(event) =>
                         setDraftRow((row) => ({ ...row, date: event.target.value }))
                       }
-                      style={expiryFieldStyle(
-                        expiryFill(expiryTone(draftRow.date), soonColor, laterColor),
+                      className={cn(
+                        "h-8 w-full rounded border px-1.5 text-sm tabular-nums outline-none focus:border-primary",
+                        expiryThisYearClass(draftRow.date),
                       )}
-                      className="h-8 w-full rounded border bg-background px-1.5 text-sm tabular-nums outline-none focus:border-primary"
                       aria-label="新保存期限"
                     />
                   </td>
@@ -831,24 +809,9 @@ export function StocktakeView() {
               <option key={item.id} value={item.name} />
             ))}
           </datalist>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-[11px] text-muted-foreground">
-            <span>保存期限只打數字，例如 271010（2027年10月10日），不用打／。</span>
-            <ExpiryColorPick
-              label="今年快過期"
-              value={soonColor}
-              onChange={(color) =>
-                updateSettings({ ...settings, expirySoonColor: color })
-              }
-            />
-            <ExpiryColorPick
-              label="2027以後"
-              value={laterColor}
-              onChange={(color) =>
-                updateSettings({ ...settings, expiryLaterColor: color })
-              }
-            />
-            <span>顏色點色塊自己選。數量可以先空白，按「暫時存檔」。 </span>
-          </div>
+          <p className="px-3 py-2 text-[11px] text-muted-foreground">
+            保存期限只打數字，不用斜線。今年的紅底，2027以後不標色。數量可以先空白，按「暫時存檔」。
+          </p>
         </div>
       )}
 
@@ -865,8 +828,6 @@ export function StocktakeView() {
           products={state.products}
           printBlank={printBlank}
           printAudit={printAudit}
-          soonColor={soonColor}
-          laterColor={laterColor}
         />
       )}
 
@@ -970,37 +931,6 @@ export function StocktakeView() {
   );
 }
 
-function ExpiryColorPick({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (color: string) => void;
-}) {
-  const color = normalizeHexColor(value, "#888888");
-  return (
-    <label className="inline-flex items-center gap-1">
-      <span
-        className="rounded px-1 font-medium"
-        style={{ backgroundColor: color, color: contrastText(color) }}
-      >
-        {label}
-      </span>
-      <input
-        type="color"
-        value={color}
-        onChange={(event) =>
-          onChange(normalizeHexColor(event.target.value, color))
-        }
-        className="h-6 w-7 cursor-pointer rounded border bg-background p-0"
-        aria-label={`${label}顏色`}
-      />
-    </label>
-  );
-}
-
 function CabinetTotals({
   stats,
   grand,
@@ -1074,8 +1004,6 @@ function StocktakePrintSheet({
   products,
   printBlank,
   printAudit,
-  soonColor,
-  laterColor,
 }: {
   shopName: string;
   title: string;
@@ -1086,8 +1014,6 @@ function StocktakePrintSheet({
   products: { id: string; price: number; cost: number }[];
   printBlank: boolean;
   printAudit: boolean;
-  soonColor: string;
-  laterColor: string;
 }) {
   const stats = groups.map((group) => ({
     title: group.title,
@@ -1138,19 +1064,13 @@ function StocktakePrintSheet({
                       {col.map((line) => {
                         const sell = lineSellPrice(line, products);
                         const qty = lineQty(line);
-                        const tone = expiryTone(line.expiresOn || "");
-                        const fill = expiryFill(tone, soonColor, laterColor);
                         return (
                           <tr key={line.productId || line.id}>
                             <td>{line.name}</td>
                             <td
-                              style={
-                                fill
-                                  ? {
-                                      backgroundColor: fill,
-                                      color: contrastText(fill),
-                                      fontWeight: 700,
-                                    }
+                              className={
+                                isThisYearExpiry(line.expiresOn || "")
+                                  ? "st-exp-expired"
                                   : undefined
                               }
                             >
