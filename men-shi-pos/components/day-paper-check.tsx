@@ -202,18 +202,24 @@ export function DayPaperCheck({
       </div>
       {open ? (
         <>
-          <div className="border-t px-2 py-1">
-            <input
-              value={find}
-              onChange={(event) => setFind(event.target.value)}
-              placeholder={`找${kind}／對紙本`}
-              className="h-6 w-full rounded border bg-background px-1.5 text-[11px] sm:max-w-48"
-            />
-          </div>
+          {kind === "支出" && lines.length === 0 ? null : (
+            <div className="border-t px-2 py-1">
+              <input
+                value={find}
+                onChange={(event) => setFind(event.target.value)}
+                placeholder={
+                  kind === "支出" ? `找${kind}` : `找${kind}／對紙本`
+                }
+                className="h-6 w-full rounded border bg-background px-1.5 text-[11px] sm:max-w-48"
+              />
+            </div>
+          )}
           {lines.length === 0 ? (
-            <p className="px-2 py-3 text-[12px] text-muted-foreground">
-              這天還沒打進{kind}。打進去後會列在這裡，方便對紙本。
-            </p>
+            kind === "支出" ? null : (
+              <p className="px-2 py-3 text-[12px] text-muted-foreground">
+                這天還沒打進{kind}。打進去後會列在這裡，方便對紙本。
+              </p>
+            )
           ) : shown.length === 0 ? (
             <p className="px-2 py-3 text-[12px] text-muted-foreground">
               找不到「{find.trim()}」
