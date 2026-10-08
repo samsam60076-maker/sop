@@ -470,7 +470,7 @@ export function StocktakeView() {
               disabled={!current}
             >
               <Printer data-icon="inline-start" />
-              列印當月盤點表
+              列印盤點表
             </Button>
             {current ? (
               <Button size="sm" type="button" variant="outline" onClick={removeSheet}>
@@ -478,7 +478,7 @@ export function StocktakeView() {
               </Button>
             ) : null}
             <Button size="sm" onClick={openMonthSheet}>
-              開立本月盤點單
+              開立盤點表
             </Button>
           </div>
         </div>
@@ -611,7 +611,7 @@ export function StocktakeView() {
       {!current ? (
         <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
           <p className="text-sm font-semibold">還沒有盤點單</p>
-          <Button onClick={openMonthSheet}>開立本月盤點單</Button>
+          <Button onClick={openMonthSheet}>開立盤點表</Button>
         </div>
       ) : binFilter === TOTALS ? (
         <div className="overflow-x-auto px-3 py-3 print:hidden">
