@@ -78,6 +78,13 @@ export function PurchasesView() {
     (sum, line) => sum + (Number(line.qty) || 0),
     0,
   );
+  const purchaseDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const purchase of state.purchases) {
+      days.add(toInputDate(new Date(purchase.createdAt)));
+    }
+    return days;
+  }, [state.purchases]);
   const dayPurchases = useMemo(
     () =>
       state.purchases.filter(
@@ -498,6 +505,7 @@ export function PurchasesView() {
               id="purchase-date"
               value={purchaseDate}
               onChange={setPurchaseDate}
+              markedDates={purchaseDays}
             />
           </div>
           <div className="mb-1.5 flex gap-1 overflow-x-auto pb-0.5">
