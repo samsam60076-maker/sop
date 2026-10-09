@@ -50,6 +50,7 @@ export function YmdPicker({
   allowEmpty = false,
   futureYears = false,
   markedDates,
+  markedHint = "有紀錄",
 }: {
   id?: string;
   value: string;
@@ -59,6 +60,7 @@ export function YmdPicker({
   allowEmpty?: boolean;
   futureYears?: boolean;
   markedDates?: Iterable<string>;
+  markedHint?: string;
 }) {
   const empty = allowEmpty && !value;
   const current = parse(value);
@@ -230,7 +232,7 @@ export function YmdPicker({
                   onClick={() => onChange(iso)}
                   title={
                     hasRecord
-                      ? `${iso} ${WEEKDAY_LONG[weekdayIndex(current.year, current.month, day)]} 有進貨`
+                      ? `${iso} ${WEEKDAY_LONG[weekdayIndex(current.year, current.month, day)]} ${markedHint}`
                       : `${iso} ${WEEKDAY_LONG[weekdayIndex(current.year, current.month, day)]}`
                   }
                   className={cn(

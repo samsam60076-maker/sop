@@ -506,6 +506,7 @@ export function PurchasesView() {
               value={purchaseDate}
               onChange={setPurchaseDate}
               markedDates={purchaseDays}
+              markedHint="有進貨"
             />
           </div>
           <div className="mb-1.5 flex gap-1 overflow-x-auto pb-0.5">

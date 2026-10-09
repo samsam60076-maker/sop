@@ -143,7 +143,6 @@ export function CheckoutView() {
   );
   const staffBuy = staffBuyMode !== "off";
   const [arrange, setArrange] = useState(false);
-  const [saleBarOpen, setSaleBarOpen] = useState(false);
   const [checkoutOrder, setCheckoutOrderState] = useState<string[]>([]);
 
   useEffect(() => {
@@ -204,6 +203,18 @@ export function CheckoutView() {
   const itemCount = lines.reduce((sum, line) => sum + line.qty, 0);
   const cashReceived = Number(received) || 0;
   const change = cashReceived - total;
+  const saleDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const sale of state.sales) {
+      if (sale.status === "completed") {
+        days.add(toInputDate(new Date(sale.createdAt)));
+      }
+    }
+    for (const item of state.saleReturns ?? []) {
+      days.add(toInputDate(new Date(item.createdAt)));
+    }
+    return days;
+  }, [state.sales, state.saleReturns]);
   const dayRefunds = useMemo(
     () =>
       (state.saleReturns ?? []).filter(
@@ -943,43 +954,30 @@ export function CheckoutView() {
         />
         <div className="border-b bg-card px-3 py-2">
           <div className="mb-1.5 space-y-1.5">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-2 text-left text-[11px] text-muted-foreground"
-              onClick={() => {
-                setSaleBarOpen((current) => {
-                  if (current) setArrange(false);
-                  return !current;
-                });
-              }}
-            >
-              <span>
-                銷貨{" "}
-                {saleDate.replace(
-                  /^(\d{4})-0?(\d+)-0?(\d+)$/,
-                  "$1年$2月$3日",
-                )}
+            <div className="flex flex-wrap items-start gap-1.5">
+              <span className="pt-0.5 text-[11px] text-muted-foreground">
+                銷貨年月日
               </span>
-              <span>{saleBarOpen ? "收起日期" : "改日期／位置"}</span>
-            </button>
-            {saleBarOpen ? (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">銷貨年月日</span>
-                <YmdPicker compact value={saleDate} onChange={setSaleDate} />
-                <button
-                  type="button"
-                  className={cn(
-                    "rounded-md border px-1.5 py-0.5 text-[11px]",
-                    arrange
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "text-muted-foreground",
-                  )}
-                  onClick={() => setArrange((current) => !current)}
-                >
-                  {arrange ? "完成位置" : "調整位置"}
-                </button>
-              </div>
-            ) : null}
+              <YmdPicker
+                tiny
+                value={saleDate}
+                onChange={setSaleDate}
+                markedDates={saleDays}
+                markedHint="有收銀"
+              />
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md border px-1.5 py-0.5 text-[11px]",
+                  arrange
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "text-muted-foreground",
+                )}
+                onClick={() => setArrange((current) => !current)}
+              >
+                {arrange ? "完成位置" : "調整位置"}
+              </button>
+            </div>
             <div className="flex rounded-md border p-0.5">
               <button
                 type="button"
