@@ -92,8 +92,8 @@ export function ShopView() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-6 md:px-6">
-      <h1 className="font-heading text-lg font-semibold">{storeName}</h1>
-      <div className="mt-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h1 className="font-heading text-lg font-semibold">{storeName}</h1>
         <button
           type="button"
           className="text-[11px] text-muted-foreground underline"
@@ -101,6 +101,8 @@ export function ShopView() {
         >
           {nameOpen ? "收起店名" : "改店名"}
         </button>
+      </div>
+      <div>
         {nameOpen ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Label htmlFor="shop-name" className="sr-only">
