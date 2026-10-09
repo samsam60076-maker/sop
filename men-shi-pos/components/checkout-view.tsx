@@ -143,6 +143,7 @@ export function CheckoutView() {
   );
   const staffBuy = staffBuyMode !== "off";
   const [arrange, setArrange] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   const [checkoutOrder, setCheckoutOrderState] = useState<string[]>([]);
 
   useEffect(() => {
@@ -954,17 +955,42 @@ export function CheckoutView() {
         />
         <div className="border-b bg-card px-3 py-2">
           <div className="mb-1.5 space-y-1.5">
-            <div className="flex flex-wrap items-start gap-1.5">
-              <span className="pt-0.5 text-[11px] text-muted-foreground">
-                銷貨年月日
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span
+                className={cn(
+                  "text-[11px]",
+                  saleDays.has(saleDate)
+                    ? "font-semibold text-emerald-800"
+                    : "text-muted-foreground",
+                )}
+              >
+                銷貨{" "}
+                {saleDate.replace(
+                  /^(\d{4})-0?(\d+)-0?(\d+)$/,
+                  "$1年$2月$3日",
+                )}{" "}
+                {
+                  ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"][
+                    new Date(
+                      Number(saleDate.slice(0, 4)),
+                      Number(saleDate.slice(5, 7)) - 1,
+                      Number(saleDate.slice(8, 10)),
+                    ).getDay()
+                  ]
+                }
               </span>
-              <YmdPicker
-                tiny
-                value={saleDate}
-                onChange={setSaleDate}
-                markedDates={saleDays}
-                markedHint="有收銀"
-              />
+              <button
+                type="button"
+                className="rounded-md border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                onClick={() => {
+                  setDateOpen((open) => {
+                    if (open) setArrange(false);
+                    return !open;
+                  });
+                }}
+              >
+                {dateOpen ? "隱藏" : "打開"}
+              </button>
               <button
                 type="button"
                 className={cn(
@@ -973,11 +999,23 @@ export function CheckoutView() {
                     ? "border-primary bg-primary text-primary-foreground"
                     : "text-muted-foreground",
                 )}
-                onClick={() => setArrange((current) => !current)}
+                onClick={() => {
+                  setArrange((current) => !current);
+                  if (!dateOpen) setDateOpen(true);
+                }}
               >
                 {arrange ? "完成位置" : "調整位置"}
               </button>
             </div>
+            {dateOpen ? (
+              <YmdPicker
+                tiny
+                value={saleDate}
+                onChange={setSaleDate}
+                markedDates={saleDays}
+                markedHint="有收銀"
+              />
+            ) : null}
             <div className="flex rounded-md border p-0.5">
               <button
                 type="button"
