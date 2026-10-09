@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { defaultSop, displayShopName, normalizeSettings } from "@/lib/shop";
+import { displayShopName, normalizeSettings } from "@/lib/shop";
 import { useStore } from "@/lib/store";
 import type { ShopSettings } from "@/lib/types";
 
@@ -32,7 +32,6 @@ export function ShopView() {
   } = useStore();
   const saved = normalizeSettings(state.settings);
   const [draft, setDraft] = useState<ShopSettings>(() => cloneSettings(saved));
-  const [showGuide, setShowGuide] = useState(false);
   const [nameOpen, setNameOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
@@ -128,7 +127,7 @@ export function ShopView() {
       </div>
 
       <section className="mt-8 border-t pt-6">
-        <h2 className="font-heading text-lg font-semibold">這一間自己的帳</h2>
+        <h2 className="font-heading text-lg font-semibold">每日收銀總品項金額</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           銷貨、進貨、庫存只在這一間。換電腦或重裝瀏覽器才用這裡。不要把本店備份匯入別間門市。
         </p>
@@ -170,71 +169,6 @@ export function ShopView() {
           </Button>
         </div>
       </section>
-
-      <div className="mt-10 border-t pt-5">
-        <button
-          type="button"
-          className="text-sm text-muted-foreground underline"
-          onClick={() => setShowGuide((current) => !current)}
-        >
-          {showGuide ? "收起作業說明" : "作業說明"}
-        </button>
-        {showGuide && (
-          <div className="mt-4 space-y-4">
-            {draft.sop.map((section) => (
-              <div key={section.id} className="space-y-2">
-                <Input
-                  value={section.title}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      sop: current.sop.map((item) =>
-                        item.id === section.id
-                          ? { ...item, title: event.target.value }
-                          : item,
-                      ),
-                    }))
-                  }
-                />
-                <Textarea
-                  value={section.body}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      sop: current.sop.map((item) =>
-                        item.id === section.id
-                          ? { ...item, body: event.target.value }
-                          : item,
-                      ),
-                    }))
-                  }
-                  className="min-h-24"
-                />
-              </div>
-            ))}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  setDraft((current) => ({
-                    ...current,
-                    sop: defaultSop(current.shopName.trim() || saved.shopName),
-                  }))
-                }
-              >
-                還原標準說明
-              </Button>
-              <Button type="button" variant="outline" onClick={() => window.print()}>
-                列印說明
-              </Button>
-              <Button type="button" onClick={save}>
-                儲存說明
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
 
       <section className="mt-10 border-t pt-6">
         <h2 className="text-sm font-semibold">總商品備份</h2>
