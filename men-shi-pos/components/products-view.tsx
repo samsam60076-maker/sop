@@ -477,7 +477,7 @@ export function ProductsView() {
           <p className="mt-1 w-full text-xs leading-5 text-muted-foreground">
             這份名稱售價七間共用。別間門市請勿在這裡改。請到
             <a href="/shop" className="underline">
-              備份門市資料
+              每日匯出營業報表
             </a>
             匯出總商品，用 LINE 傳過去再匯入。
           </p>
