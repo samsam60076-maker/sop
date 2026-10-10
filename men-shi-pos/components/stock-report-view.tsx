@@ -514,14 +514,6 @@ export function StockReportView() {
                   <p className="font-semibold">
                     {storeName}銷售表 · {month}/{date}
                   </p>
-                  <p className="text-sm">
-                    今天總共販售 {soldRows.length} 項 · {daySaleTotals.qty} 件 · 金額{" "}
-                    {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
-                    {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
-                    {dayWriteoffs.length
-                      ? ` · 銷貨 ${dayWriteoffs.length}項 ${dayWriteoffTotals.qty}件`
-                      : ""}
-                  </p>
                 </>
               ) : printJob === "purchases" ? (
                 <>
