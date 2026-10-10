@@ -201,6 +201,10 @@ export function StockReportView() {
     () => chunkSoldProducts(soldRows, 3).filter((col) => col.length > 0),
     [soldRows],
   );
+  const soldPrintCols = useMemo(
+    () => chunkSoldProducts(soldRows, 2),
+    [soldRows],
+  );
   const dayRefund = returnDetailTotals(dayReturns).amount;
   const dayRevenue = daySaleTotals.amount - dayRefund;
   const monthRevenue = saleDetailTotals(monthSales);
@@ -824,46 +828,48 @@ export function StockReportView() {
           </p>
         ) : (
           <>
-          <div className="rp-day-sold-grid mt-1 hidden print:block">
-            <table className="rp-print-table w-full">
-              <thead>
-                <tr>
-                  <th className="text-left font-semibold">品項</th>
-                  <th className="num font-semibold">賣價</th>
-                  <th className="num font-semibold">數量</th>
-                  <th className="num font-semibold">金額</th>
-                  <th className="num font-semibold">批發</th>
-                </tr>
-              </thead>
-              <tbody>
-                {soldRows.map((row) => (
-                  <tr key={row.productId || row.name}>
-                    <td>{row.name}</td>
-                    <td className="num tabular-nums">
-                      {row.unitPrice == null
-                        ? Math.round(row.amount / Math.max(row.qty, 1))
-                        : Math.round(row.unitPrice)}
-                    </td>
-                    <td className="num tabular-nums">{row.qty}</td>
-                    <td className="num tabular-nums">{Math.round(row.amount)}</td>
-                    <td className="num tabular-nums">{Math.round(row.costAmount)}</td>
+          <div className="rp-day-sold-grid mt-1 hidden print:grid">
+            {soldPrintCols.map((col, colIndex) => (
+              <table key={colIndex} className="rp-print-table w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left font-semibold">品項</th>
+                    <th className="num font-semibold">賣價</th>
+                    <th className="num font-semibold">數量</th>
+                    <th className="num font-semibold">金額</th>
+                    <th className="num font-semibold">批發</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td className="font-semibold">合計</td>
-                  <td />
-                  <td className="num font-semibold tabular-nums">{daySaleTotals.qty}</td>
-                  <td className="num font-semibold tabular-nums">
-                    {Math.round(daySaleTotals.amount)}
-                  </td>
-                  <td className="num font-semibold tabular-nums">
-                    {Math.round(daySaleTotals.costAmount)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {col.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-muted-foreground">
+                        —
+                      </td>
+                    </tr>
+                  ) : (
+                    col.map((row) => (
+                      <tr key={row.productId || row.name}>
+                        <td>{row.name}</td>
+                        <td className="num tabular-nums">
+                          {row.unitPrice == null
+                            ? Math.round(row.amount / Math.max(row.qty, 1))
+                            : Math.round(row.unitPrice)}
+                        </td>
+                        <td className="num tabular-nums">{row.qty}</td>
+                        <td className="num tabular-nums">{Math.round(row.amount)}</td>
+                        <td className="num tabular-nums">{Math.round(row.costAmount)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ))}
+            <p className="rp-day-sold-total">
+              總合計 · {soldRows.length}項 · {daySaleTotals.qty}件 · 金額{" "}
+              {Math.round(daySaleTotals.amount)} · 批發{" "}
+              {Math.round(daySaleTotals.costAmount)}
+            </p>
           </div>
           <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-3 print:hidden">
             {soldCols.map((col, colIndex) => {

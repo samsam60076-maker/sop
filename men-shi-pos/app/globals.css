@@ -143,8 +143,20 @@
     background: #fff;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   }
-  html[data-print-preview] .rp-day-sold-grid {
-    display: block;
+  html[data-print-preview] .rp-day-sold-grid,
+  html[data-print-preview] .hidden.print\:grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 12px;
+    row-gap: 6px;
+  }
+  html[data-print-preview] .rp-day-sold-total {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 6px 8px 0;
+    border-top: 2px solid #111;
+    font-size: 13px;
+    font-weight: 700;
   }
   html[data-print-preview] .rp-day-sold-grid table,
   html[data-print-preview] .rp-print-table {
@@ -168,8 +180,8 @@
   html[data-print-preview] .rp-day-sold-grid .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
-    min-width: 4.5em;
-    padding-right: 16px;
+    min-width: 3em;
+    padding-right: 8px;
   }
   html[data-print-preview] .hidden.print\:block {
     display: block !important;
@@ -341,10 +353,21 @@
       font-weight: 700;
     }
     .rp-day-sold-grid {
-      display: block;
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 4mm;
+      row-gap: 2mm;
       font-size: 12px;
       line-height: 1.35;
       color: #111;
+    }
+    .rp-day-sold-total {
+      grid-column: 1 / -1;
+      margin: 0;
+      padding: 2mm 0 0;
+      border-top: 2px solid #111;
+      font-size: 13px;
+      font-weight: 700;
     }
     .rp-print-table,
     .rp-day-sold-grid table {
@@ -368,8 +391,8 @@
     .rp-day-sold-grid .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
-      min-width: 4.5em;
-      padding-right: 16px;
+      min-width: 3em;
+      padding-right: 8px;
     }
     .rp-day-sold-grid tfoot td,
     .rp-print-table tfoot td {
