@@ -197,7 +197,10 @@ export function StockReportView() {
   const daySaleTotals = saleDetailTotals(daySales);
   const dayWriteoffTotals = saleDetailTotals(dayWriteoffs);
   const soldRows = useMemo(() => summarizeSoldProducts(daySales), [daySales]);
-  const soldCols = useMemo(() => chunkSoldProducts(soldRows, 3), [soldRows]);
+  const soldCols = useMemo(
+    () => chunkSoldProducts(soldRows, 3).filter((col) => col.length > 0),
+    [soldRows],
+  );
   const dayRefund = returnDetailTotals(dayReturns).amount;
   const dayRevenue = daySaleTotals.amount - dayRefund;
   const monthRevenue = saleDetailTotals(monthSales);
@@ -824,8 +827,15 @@ export function StockReportView() {
               return (
                 <table
                   key={colIndex}
-                  className="w-full text-[11px] print:text-[10px]"
+                  className="rp-print-table w-full text-[11px] print:text-[10px]"
                 >
+                  <colgroup>
+                    <col style={{ width: "32%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "17%" }} />
+                  </colgroup>
                   <thead>
                     <tr className="border-b">
                       <th className="py-0.5 text-left font-semibold">品項</th>
@@ -900,7 +910,13 @@ export function StockReportView() {
             這個日期還沒有銷貨。
           </p>
         ) : (
-          <table className="mt-1 w-full text-[11px] print:text-[10px]">
+          <table className="rp-print-table mt-1 w-full text-[11px] print:text-[10px]">
+            <colgroup>
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "48%" }} />
+              <col style={{ width: "12%" }} />
+            </colgroup>
             <thead>
               <tr className="border-b">
                 <th className="py-0.5 text-left font-semibold">品項</th>
@@ -1115,17 +1131,68 @@ export function StockReportView() {
         </div>
       </section>
 
-      <div className="rp-returns overflow-x-auto">
-        {returnLines.length === 0 ? (
-          <p
-            className={cn(
-              "px-6 py-12 text-center text-muted-foreground",
-              printJob !== "dayCash" && "print:hidden",
-            )}
-          >
-            這個日期還沒有退貨。
-          </p>
-        ) : (
+      {returnLines.length > 0 ? (
+        <div className="rp-returns hidden print:block px-3 pb-2 md:px-4 print:px-0">
+          <table className="rp-print-table w-full text-[11px] print:text-[10px]">
+            <colgroup>
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: "10%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "20%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="text-left font-semibold">時間</th>
+                <th className="text-left font-semibold">商品名稱</th>
+                <th className="num font-semibold">數量</th>
+                <th className="num font-semibold">售價</th>
+                <th className="num font-semibold">退貨金額</th>
+                <th className="text-left font-semibold">備註</th>
+              </tr>
+            </thead>
+            <tbody>
+              {returnLines.map((line, index) => (
+                <tr key={`${line.returnId}-print-${index}`}>
+                  <td>{formatTime(line.createdAt)}</td>
+                  <td>{line.name}</td>
+                  <td className="num tabular-nums">{line.qty}</td>
+                  <td className="num tabular-nums">{Math.round(line.unitPrice)}</td>
+                  <td className="num tabular-nums">{Math.round(line.amount)}</td>
+                  <td>{line.note || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="font-semibold">合計</td>
+                <td />
+                <td className="num font-semibold tabular-nums">{refundTotal.qty}</td>
+                <td />
+                <td className="num font-semibold tabular-nums">
+                  {Math.round(refundTotal.amount)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ) : null}
+
+      {returnLines.length === 0 ? (
+        <p
+          className={cn(
+            "rp-returns px-6 py-8 text-center text-sm text-muted-foreground print:py-2 print:text-[11px]",
+            printJob !== "dayCash" && "print:hidden",
+          )}
+        >
+          這個日期還沒有退貨。
+        </p>
+      ) : null}
+
+      <div className="rp-returns overflow-x-auto print:hidden">
+        {returnLines.length === 0 ? null : (
           <Table>
             <TableHeader>
               <TableRow>
