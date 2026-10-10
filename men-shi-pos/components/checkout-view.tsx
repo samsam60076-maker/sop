@@ -40,6 +40,7 @@ import {
   toInputDate,
   twd,
 } from "@/lib/format";
+import { saleOriginOf } from "@/lib/report";
 import { useStore } from "@/lib/store";
 import { NoticeSplitPanel } from "@/components/notice-split-panel";
 import { DayPaperCheck, type DayPaperLine } from "@/components/day-paper-check";
@@ -214,7 +215,7 @@ export function CheckoutView() {
   const saleDays = useMemo(() => {
     const days = new Set<string>();
     for (const sale of state.sales) {
-      if (sale.status === "completed") {
+      if (sale.status === "completed" && saleOriginOf(sale) !== "writeoff") {
         days.add(toInputDate(new Date(sale.createdAt)));
       }
     }
@@ -235,6 +236,7 @@ export function CheckoutView() {
       state.sales.filter(
         (sale) =>
           sale.status === "completed" &&
+          saleOriginOf(sale) !== "writeoff" &&
           toInputDate(new Date(sale.createdAt)) === saleDate,
       ),
     [state.sales, saleDate],

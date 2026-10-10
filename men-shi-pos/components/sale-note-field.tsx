@@ -8,11 +8,13 @@ export function SaleNoteField({
   value,
   onChange,
   required,
+  placeholder,
 }: {
   id?: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  placeholder?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -21,7 +23,9 @@ export function SaleNoteField({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={required ? "自己打原因" : "可留空"}
+        placeholder={
+          placeholder ?? (required ? "例如 壞掉、過期、報廢" : "可留空")
+        }
       />
     </div>
   );
