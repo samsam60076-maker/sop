@@ -339,14 +339,7 @@ export function installDealDemo(
       priceTiers: [],
     });
     if (!result.ok) return result;
-    current = {
-      ...result.state,
-      products: result.state.products.map((item) =>
-        item.id === result.data.id
-          ? { ...item, stock: Math.max(item.stock, 10), active: true }
-          : item,
-      ),
-    };
+    current = result.state;
     partIds.push(result.data.id);
   }
 
@@ -366,14 +359,7 @@ export function installDealDemo(
     priceTiers: [{ qty: 2, total: 100 }],
   });
   if (!dealResult.ok) return dealResult;
-  current = {
-    ...dealResult.state,
-    products: dealResult.state.products.map((item) =>
-      item.id === dealResult.data.id
-        ? { ...item, stock: Math.max(item.stock, 10), active: true }
-        : item,
-    ),
-  };
+  current = dealResult.state;
 
   const comboExisting = current.products.find(
     (item) => item.name === DEMO_COMBO_NAME,
@@ -391,17 +377,51 @@ export function installDealDemo(
     priceTiers: [],
   });
   if (!comboResult.ok) return comboResult;
-  current = {
-    ...comboResult.state,
-    products: comboResult.state.products.map((item) =>
-      item.id === comboResult.data.id ? { ...item, active: true } : item,
-    ),
-  };
+  current = comboResult.state;
+
+  const inbound = applyPurchase(current, {
+    note: "示範進貨",
+    items: [
+      ...partIds.map((productId, index) => ({
+        productId,
+        qty: 10,
+        unitCost: DEMO_PARTS[index]?.cost ?? 0,
+        unitPrice: DEMO_PARTS[index]?.price,
+      })),
+      {
+        productId: dealResult.data.id,
+        qty: 10,
+        unitCost: 20,
+        unitPrice: 60,
+      },
+    ],
+  });
+  if (!inbound.ok) return inbound;
 
   return {
     ok: true,
     data: { combo: comboResult.data, deal: dealResult.data },
-    state: current,
+    state: inbound.state,
+  };
+}
+
+export function resetStockWithoutPurchases(state: AppState): AppState {
+  const bought = new Set<string>();
+  for (const purchase of state.purchases) {
+    for (const item of purchase.items) bought.add(item.productId);
+  }
+  return {
+    ...state,
+    products: state.products
+      .filter(
+        (product) =>
+          product.name !== DEMO_COMBO_NAME && product.name !== DEMO_DEAL_NAME,
+      )
+      .map((product) =>
+        bought.has(product.id) || product.stock === 0
+          ? product
+          : { ...product, stock: 0 },
+      ),
   };
 }
 

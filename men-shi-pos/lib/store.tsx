@@ -45,6 +45,7 @@ import {
   removeReturns,
   removeSale,
   removeSales,
+  resetStockWithoutPurchases,
   renameBin,
   renameCategory,
   setProductActive,
@@ -443,7 +444,13 @@ function sanitizeWorkspace(value: unknown): Workspace | null {
   ) {
     currentStoreId = parsed.currentStoreId;
   }
-  return { version: 6, currentStoreId, stores, branches };
+  return {
+    version: 6,
+    currentStoreId,
+    stores,
+    branches,
+    stockResetNoPurchase: parsed.stockResetNoPurchase === true,
+  };
 }
 
 function parseWorkspace(raw: string | null): Workspace | null {
@@ -472,6 +479,17 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
+function clearOrphanStock(workspace: Workspace): Workspace {
+  if (workspace.stockResetNoPurchase) return workspace;
+  const stores = { ...workspace.stores };
+  for (const branch of listedBranches(workspace)) {
+    const state = stores[branch.id];
+    if (!state) continue;
+    stores[branch.id] = resetStockWithoutPurchases(state);
+  }
+  return { ...workspace, stores, stockResetNoPurchase: true };
+}
+
 function loadWorkspace(): Workspace {
   if (!canUseStorage()) return emptyWorkspace();
   const current = parseWorkspace(localStorage.getItem(STORAGE_KEY));
@@ -484,8 +502,9 @@ function loadWorkspace(): Workspace {
       : current ?? backup;
   if (richer && workspaceHasWork(richer)) {
     const unified = unifySharedCatalog(richer);
-    persist(unified);
-    return unified;
+    const cleaned = clearOrphanStock(unified);
+    persist(cleaned, { force: !unified.stockResetNoPurchase });
+    return cleaned;
   }
 
   const older = LEGACY_KEYS.map((key) => parseStored(localStorage.getItem(key)));

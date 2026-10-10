@@ -22,6 +22,7 @@ export type Workspace = {
   currentStoreId: BranchId;
   stores: Record<string, AppState>;
   branches: Branch[];
+  stockResetNoPurchase?: boolean;
 };
 
 export function isBranchId(value: string): value is BranchId {
