@@ -36,13 +36,13 @@ export function StoreBar() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 px-2 py-0.5">
-      <span className="shrink-0 text-[11px] text-sidebar-foreground/70">
+    <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 px-2 py-0.5">
+      <span className="shrink-0 text-[10px] text-sidebar-foreground/70">
         總部
       </span>
       <button
         type="button"
-        className="inline-flex h-6 items-center rounded border border-sidebar-border px-1.5 text-[11px] text-sidebar-foreground/80 hover:bg-sidebar-accent"
+        className="inline-flex h-5 items-center rounded border border-sidebar-border px-1 text-[10px] text-sidebar-foreground/80 hover:bg-sidebar-accent"
         onClick={() => {
           setOpen((currentOpen) => {
             if (currentOpen) setEditing(false);
@@ -60,7 +60,7 @@ export function StoreBar() {
               type="button"
               onClick={() => switchStore(branch.id)}
               className={cn(
-                "inline-flex h-6 items-center rounded px-1.5 text-xs",
+                "inline-flex h-5 items-center rounded px-1 text-[10px]",
                 storeId === branch.id
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
@@ -71,7 +71,7 @@ export function StoreBar() {
             {editing ? (
               <button
                 type="button"
-                className="inline-flex h-6 w-5 items-center justify-center text-[11px] text-red-200 hover:text-white"
+                className="inline-flex h-5 w-4 items-center justify-center text-[10px] text-red-200 hover:text-white"
                 aria-label={`刪除 ${branch.name}`}
                 onClick={() => {
                   if (branches.length <= 1) {
@@ -100,7 +100,7 @@ export function StoreBar() {
         ))}
         <button
           type="button"
-          className="inline-flex h-6 items-center rounded px-1.5 text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent"
+          className="inline-flex h-5 items-center rounded px-1 text-[10px] text-sidebar-foreground/80 hover:bg-sidebar-accent"
           onClick={() => {
             setAdding(true);
             setName("");
@@ -111,7 +111,7 @@ export function StoreBar() {
         <button
           type="button"
           className={cn(
-            "inline-flex h-6 items-center rounded px-1.5 text-xs",
+            "inline-flex h-5 items-center rounded px-1 text-[10px]",
             editing
               ? "bg-sidebar-accent text-sidebar-foreground"
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent",
@@ -122,7 +122,7 @@ export function StoreBar() {
         </button>
       </div>
       ) : (
-        <span className="inline-flex h-6 items-center rounded bg-sidebar-primary px-1.5 text-xs text-sidebar-primary-foreground">
+        <span className="inline-flex h-5 items-center rounded bg-sidebar-primary px-1 text-[10px] text-sidebar-primary-foreground">
           {current?.name ?? ""}
         </span>
       )}
