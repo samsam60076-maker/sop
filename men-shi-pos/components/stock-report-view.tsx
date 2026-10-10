@@ -228,6 +228,10 @@ export function StockReportView() {
     () => monthDailyCashTotals(monthDailyRows),
     [monthDailyRows],
   );
+  const monthDailyPrintCols = useMemo(
+    () => chunkSoldProducts(monthDailyRows, 2),
+    [monthDailyRows],
+  );
   const hqRows = useMemo(
     () =>
       allStores.map((store) => {
@@ -732,7 +736,45 @@ export function StockReportView() {
           含員工價、團媽價。列印只印當日售出、批發與支出。
         </p>
       </section>
-      <div className="rp-month-daily overflow-x-auto">
+      {monthDailyRows.length > 0 ? (
+        <div className="rp-month-daily rp-month-grid hidden print:grid px-3 pb-2 print:px-0">
+          {monthDailyPrintCols.map((col, colIndex) => (
+            <table key={colIndex} className="rp-print-table w-full">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold">日</th>
+                  <th className="num font-semibold">收銀售出</th>
+                  <th className="num font-semibold">收銀批發</th>
+                  <th className="num font-semibold">支出</th>
+                </tr>
+              </thead>
+              <tbody>
+                {col.map((row) => (
+                  <tr key={row.date}>
+                    <td className="tabular-nums">{row.day}</td>
+                    <td className="num tabular-nums">
+                      {row.saleAmount ? Math.round(row.saleAmount) : "—"}
+                    </td>
+                    <td className="num tabular-nums">
+                      {row.costAmount ? Math.round(row.costAmount) : "—"}
+                    </td>
+                    <td className="num tabular-nums">
+                      {row.expenseAmount ? Math.round(row.expenseAmount) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ))}
+          <p className="rp-day-sold-total">
+            總合計 · 售出 {Math.round(monthDailyTotals.saleAmount)} · 批發{" "}
+            {Math.round(monthDailyTotals.costAmount)} · 支出{" "}
+            {Math.round(monthDailyTotals.expenseAmount)}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="rp-month-daily overflow-x-auto print:hidden">
         <Table>
           <TableHeader>
             <TableRow>

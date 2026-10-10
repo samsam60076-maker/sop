@@ -146,7 +146,8 @@
   html[data-print-preview] .rp-day-sold-grid,
   html[data-print-preview] .hidden.print\:grid,
   html[data-print-preview] .rp-pair,
-  html[data-print-preview] .rp-buy-grid {
+  html[data-print-preview] .rp-buy-grid,
+  html[data-print-preview] .rp-month-grid {
     display: grid !important;
     grid-template-columns: 1fr 1fr;
     column-gap: 12px;
@@ -368,7 +369,8 @@
     }
     .rp-day-sold-grid,
     .rp-pair,
-    .rp-buy-grid {
+    .rp-buy-grid,
+    .rp-month-grid {
       display: grid !important;
       grid-template-columns: 1fr 1fr;
       column-gap: 4mm;
