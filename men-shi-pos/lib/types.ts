@@ -63,6 +63,12 @@ export type PriceTier = {
   total: number;
 };
 
+export type MixDeal = {
+  group: string;
+  qty: number;
+  total: number;
+};
+
 export type Product = {
   id: string;
   sku: string;
@@ -77,6 +83,7 @@ export type Product = {
   active: boolean;
   comboParts?: ComboPart[];
   priceTiers?: PriceTier[];
+  mixDeal?: MixDeal;
 };
 
 export type PurchaseItem = {

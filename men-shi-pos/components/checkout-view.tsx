@@ -20,7 +20,7 @@ import { YmdPicker } from "@/components/ymd-picker";
 import { listedCategories, normalizeSettings } from "@/lib/shop";
 import {
   comboPartsOf,
-  dealTotal,
+  priceCartLines,
   isCombo,
   lineAmount,
   priceTiersOf,
@@ -188,17 +188,24 @@ export function CheckoutView() {
     return sortForCheckout(filtered, checkoutOrder);
   }, [state.products, query, category, checkoutOrder]);
 
-  const lines = cart
-    .map((line) => {
-      const product = state.products.find((item) => item.id === line.productId);
-      if (!product) return null;
-      const amount =
-        staffBuy || line.priceReason || isCombo(product)
-          ? line.unitPrice * line.qty
-          : dealTotal(product, line.qty);
-      return { ...line, product, amount };
-    })
-    .filter((line): line is NonNullable<typeof line> => Boolean(line));
+  const lines = (() => {
+    const raw = cart
+      .map((line) => {
+        const product = state.products.find((item) => item.id === line.productId);
+        if (!product) return null;
+        return { ...line, product };
+      })
+      .filter((line): line is NonNullable<typeof line> => Boolean(line));
+    const priced = priceCartLines(raw, staffBuy);
+    return raw.map((line) => {
+      const row = priced.find((item) => item.id === line.id);
+      return {
+        ...line,
+        amount: row?.amount ?? line.unitPrice * line.qty,
+        mixHint: row?.mixHint,
+      };
+    });
+  })();
 
   const total = lines.reduce((sum, line) => sum + line.amount, 0);
   const itemCount = lines.reduce((sum, line) => sum + line.qty, 0);
@@ -734,8 +741,13 @@ export function CheckoutView() {
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
-                  {(discounted && !staffBuy) || line.qty > 1 ? (
+                  {(discounted && !staffBuy) || line.qty > 1 || line.mixHint ? (
                     <div className="mt-0.5 flex gap-3">
+                      {line.mixHint ? (
+                        <span className="text-[11px] text-emerald-800">
+                          {line.mixHint}
+                        </span>
+                      ) : null}
                       {discounted && !staffBuy ? (
                         <button
                           type="button"

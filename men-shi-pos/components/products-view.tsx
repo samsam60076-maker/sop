@@ -19,6 +19,7 @@ import {
   comboListTotal,
   comboPartsOf,
   isCombo,
+  mixDealOf,
   priceTiersOf,
 } from "@/lib/pricing";
 import { normalizeSettings } from "@/lib/shop";
@@ -40,6 +41,10 @@ type FormState = {
   pickIds: string[];
   pickQty: string;
   tiers: { qty: string; total: string }[];
+  mixOn: boolean;
+  mixGroup: string;
+  mixQty: string;
+  mixTotal: string;
 };
 
 type RowDraft = {
@@ -70,6 +75,10 @@ function emptyForm(category: string): FormState {
     pickIds: [],
     pickQty: "1",
     tiers: [],
+    mixOn: false,
+    mixGroup: "任選3個100",
+    mixQty: "3",
+    mixTotal: "100",
   };
 }
 
@@ -136,6 +145,10 @@ function formFromProduct(product: Product): FormState {
       qty: String(tier.qty),
       total: String(tier.total),
     })),
+    mixOn: Boolean(mixDealOf(product)),
+    mixGroup: mixDealOf(product)?.group ?? "任選3個100",
+    mixQty: String(mixDealOf(product)?.qty ?? 3),
+    mixTotal: String(mixDealOf(product)?.total ?? 100),
   };
 }
 
@@ -389,6 +402,14 @@ export function ProductsView() {
             total: Number(tier.total) || 0,
           }))
           .filter((tier) => tier.qty >= 2);
+    const mixDeal =
+      form.asCombo || !form.mixOn
+        ? null
+        : {
+            group: form.mixGroup.trim() || "任選3個100",
+            qty: Number(form.mixQty) || 0,
+            total: Number(form.mixTotal) || 0,
+          };
     const payload = {
       sku: form.sku,
       name,
@@ -399,6 +420,7 @@ export function ProductsView() {
       minStock: 0,
       comboParts,
       priceTiers,
+      mixDeal,
     };
     const result = editingId
       ? updateProduct({ ...payload, id: editingId })
@@ -665,6 +687,7 @@ export function ProductsView() {
                     ...current,
                     asCombo: event.target.checked,
                     tiers: event.target.checked ? [] : current.tiers,
+                    mixOn: event.target.checked ? false : current.mixOn,
                   }))
                 }
               />
@@ -968,6 +991,75 @@ export function ProductsView() {
                     庫存仍按件扣。賣 1 件扣 1，賣 2 件扣 2，只是收銀收 100 而不是 120。
                   </p>
                 ) : null}
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.mixOn}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        mixOn: event.target.checked,
+                      }))
+                    }
+                  />
+                  可跟其他口味湊件數（A+B+C 三個共 100）
+                </label>
+                {form.mixOn ? (
+                  <div className="space-y-2 rounded-md bg-muted/40 px-2 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      同一群組的商品可以互相湊。A、B、C、D、E 都勾這個，群組都寫「任選3個100」，收銀點 A+B+C 就收 100。
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="min-w-[8rem] flex-1 space-y-0.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          群組
+                        </span>
+                        <input
+                          value={form.mixGroup}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              mixGroup: event.target.value,
+                            }))
+                          }
+                          className={cn(addInputClass, "w-full")}
+                        />
+                      </label>
+                      <label className="w-20 space-y-0.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          幾個
+                        </span>
+                        <input
+                          className={cn(addInputClass, "w-full tabular-nums")}
+                          inputMode="numeric"
+                          value={form.mixQty}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              mixQty: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="w-24 space-y-0.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          收多少
+                        </span>
+                        <input
+                          className={cn(addInputClass, "w-full tabular-nums")}
+                          inputMode="numeric"
+                          value={form.mixTotal}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              mixTotal: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -1118,7 +1210,8 @@ export function ProductsView() {
                           !product.active ||
                           dirty ||
                           isCombo(product) ||
-                          priceTiersOf(product).length > 0) && (
+                          priceTiersOf(product).length > 0 ||
+                          mixDealOf(product)) && (
                           <span className="shrink-0 text-[11px] text-muted-foreground">
                             {product.sku}
                             {product.active ? "" : " · 已停售"}
@@ -1129,6 +1222,9 @@ export function ProductsView() {
                               (tier) =>
                                 ` · ${tier.qty}個${tier.total}`,
                             )}
+                            {mixDealOf(product)
+                              ? ` · ${mixDealOf(product)?.group}`
+                              : ""}
                             {dirty ? " · 未確定" : ""}
                           </span>
                         )}

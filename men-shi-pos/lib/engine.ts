@@ -9,6 +9,7 @@ import type {
   PaymentMethod,
   Category,
   ComboPart,
+  MixDeal,
   PriceTier,
   Unit,
   Stocktake,
@@ -104,6 +105,15 @@ function cleanPriceTiers(input: PriceTier[] | undefined): PriceTier[] {
   return tiers.sort((left, right) => left.qty - right.qty);
 }
 
+function cleanMixDeal(input: MixDeal | null | undefined): MixDeal | undefined {
+  if (!input) return undefined;
+  const group = input.group.trim();
+  const qty = Math.round(input.qty);
+  const total = Math.round(input.total);
+  if (!group || qty < 2 || !Number.isFinite(total) || total < 0) return undefined;
+  return { group, qty, total };
+}
+
 function addStock(products: Product[], add: Map<string, number>) {
   return products.map((product) => {
     const qty = add.get(product.id) ?? 0;
@@ -169,6 +179,7 @@ export function upsertProduct(
     minStock: number;
     comboParts?: ComboPart[];
     priceTiers?: PriceTier[];
+    mixDeal?: MixDeal | null;
   },
 ): EngineResult<Product> {
   const name = input.name.trim();
@@ -212,6 +223,12 @@ export function upsertProduct(
           ? priceTiersOf(existingForDeals)
           : []
         : cleanPriceTiers(input.priceTiers);
+  const mixDeal =
+    comboParts.length > 0
+      ? undefined
+      : input.mixDeal === undefined
+        ? existingForDeals?.mixDeal
+        : cleanMixDeal(input.mixDeal);
 
   const category = input.category.trim();
   if (!category) return { ok: false, error: "請選擇分類" };
@@ -242,6 +259,7 @@ export function upsertProduct(
       minStock: comboParts.length > 0 ? 0 : Math.round(input.minStock),
       comboParts,
       priceTiers,
+      mixDeal,
     };
     return {
       ok: true,
@@ -272,6 +290,7 @@ export function upsertProduct(
     active: true,
     comboParts,
     priceTiers,
+    mixDeal,
   };
   return {
     ok: true,

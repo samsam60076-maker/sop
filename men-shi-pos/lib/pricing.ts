@@ -1,4 +1,10 @@
-import type { ComboPart, PriceTier, Product, SaleItem } from "@/lib/types";
+import type {
+  ComboPart,
+  MixDeal,
+  PriceTier,
+  Product,
+  SaleItem,
+} from "@/lib/types";
 
 export function comboPartsOf(product: Product): ComboPart[] {
   return (product.comboParts ?? []).filter(
@@ -10,6 +16,20 @@ export function priceTiersOf(product: Product): PriceTier[] {
   return (product.priceTiers ?? []).filter(
     (tier) => tier.qty >= 2 && Number.isFinite(tier.total) && tier.total >= 0,
   );
+}
+
+export function mixDealOf(product: Product): MixDeal | null {
+  const raw = product.mixDeal;
+  if (!raw) return null;
+  const group = raw.group.trim();
+  const qty = Math.round(raw.qty);
+  const total = Math.round(raw.total);
+  if (!group || qty < 2 || !Number.isFinite(total) || total < 0) return null;
+  return { group, qty, total };
+}
+
+export function mixDealKey(deal: MixDeal) {
+  return `${deal.group}::${deal.qty}::${deal.total}`;
 }
 
 export function isCombo(product: Product): boolean {
@@ -135,4 +155,81 @@ export function expandComboLines(
 
 export function saleItemsTotal(items: SaleItem[]): number {
   return items.reduce((sum, item) => sum + lineAmount(item), 0);
+}
+
+export function priceCartLines(
+  lines: {
+    id: string;
+    product: Product;
+    qty: number;
+    unitPrice: number;
+    priceReason?: string;
+  }[],
+  staffBuy: boolean,
+): { id: string; amount: number; mixHint?: string }[] {
+  const byId = new Map<string, { amount: number; mixHint?: string }>();
+  const groups = new Map<
+    string,
+    {
+      deal: MixDeal;
+      members: { id: string; qty: number; price: number }[];
+    }
+  >();
+
+  for (const line of lines) {
+    const locked =
+      staffBuy ||
+      Boolean(line.priceReason) ||
+      isCombo(line.product) ||
+      line.unitPrice !== line.product.price;
+    const deal = locked ? null : mixDealOf(line.product);
+    if (!deal) {
+      const amount =
+        staffBuy || line.priceReason || isCombo(line.product)
+          ? line.unitPrice * line.qty
+          : dealTotal(line.product, line.qty);
+      byId.set(line.id, { amount });
+      continue;
+    }
+    const key = mixDealKey(deal);
+    const bucket = groups.get(key) ?? { deal, members: [] };
+    bucket.members.push({
+      id: line.id,
+      qty: line.qty,
+      price: line.product.price,
+    });
+    groups.set(key, bucket);
+  }
+
+  for (const { deal, members } of groups.values()) {
+    const units: { id: string; price: number }[] = [];
+    for (const member of members) {
+      for (let i = 0; i < member.qty; i += 1) units.push(member);
+    }
+    const packs = Math.floor(units.length / deal.qty);
+    const covered = packs * deal.qty;
+    const shares = allocateAmounts(
+      units.slice(0, covered).map((unit) => unit.price),
+      packs * deal.total,
+    );
+    const totals = new Map<string, number>();
+    units.forEach((unit, index) => {
+      const add =
+        index < covered ? (shares[index] ?? 0) : unit.price;
+      totals.set(unit.id, (totals.get(unit.id) ?? 0) + add);
+    });
+    const hint = packs > 0 ? `任選${deal.qty}個${deal.total}` : undefined;
+    for (const member of members) {
+      byId.set(member.id, {
+        amount: totals.get(member.id) ?? 0,
+        mixHint: hint,
+      });
+    }
+  }
+
+  return lines.map((line) => ({
+    id: line.id,
+    amount: byId.get(line.id)?.amount ?? 0,
+    mixHint: byId.get(line.id)?.mixHint,
+  }));
 }
