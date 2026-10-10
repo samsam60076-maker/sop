@@ -626,11 +626,11 @@ export function CheckoutView() {
               return (
                 <li
                   key={line.id}
-                  className="rounded border bg-background px-2 py-1.5"
+                  className="rounded border bg-background px-1.5 py-1"
                 >
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <div className="min-w-0 flex-1 basis-32">
-                      <p className="truncate text-[13px] font-medium leading-tight">
+                  <div className="flex flex-nowrap items-center gap-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[12px] font-medium leading-tight">
                         {line.product.name}
                         {isCombo(line.product) ? "（套）" : ""}
                       </p>
@@ -648,10 +648,10 @@ export function CheckoutView() {
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex shrink-0 items-center">
                       <button
                         type="button"
-                        className="flex size-7 items-center justify-center rounded-sm border bg-card"
+                        className="flex size-6 items-center justify-center rounded-sm border bg-card"
                         onClick={() => setQty(line.id, line.qty - 1)}
                         aria-label="減少"
                       >
@@ -665,24 +665,24 @@ export function CheckoutView() {
                         onChange={(event) =>
                           setQty(line.id, Number(event.target.value) || 0)
                         }
-                        className="h-7 w-8 border-y bg-card text-center text-xs tabular-nums"
+                        className="h-6 w-7 border-y bg-card text-center text-xs tabular-nums"
                         aria-label={`${line.product.name} 數量`}
                       />
                       <button
                         type="button"
-                        className="flex size-7 items-center justify-center rounded-sm border bg-card"
+                        className="flex size-6 items-center justify-center rounded-sm border bg-card"
                         onClick={() => setQty(line.id, line.qty + 1)}
                         aria-label="增加"
                       >
                         <Plus className="size-3" />
                       </button>
                     </div>
-                    <span className="w-[4.75rem] shrink-0 text-right text-[13px] font-medium tabular-nums">
+                    <span className="w-[3.75rem] shrink-0 text-right text-[12px] font-medium tabular-nums">
                       {twd(line.amount)}
                       {staffBuy ? "批" : discounted ? "改" : ""}
                     </span>
                     {staffBuy ? (
-                      <span className="text-[12px] tabular-nums text-muted-foreground">
+                      <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
                         {twd(line.unitPrice)}
                       </span>
                     ) : (
@@ -696,7 +696,7 @@ export function CheckoutView() {
                           onChange={(event) =>
                             setLinePrice(line.id, event.target.value)
                           }
-                          className="h-7 w-16 rounded-sm border bg-card px-1 text-center text-[13px] tabular-nums"
+                          className="h-6 w-14 shrink-0 rounded-sm border bg-card px-0.5 text-center text-[12px] tabular-nums"
                           aria-label={`${line.product.name} 售價`}
                           title="售價"
                         />
@@ -704,7 +704,7 @@ export function CheckoutView() {
                           type="button"
                           aria-pressed={line.priceReason === "瑕疵"}
                           className={cn(
-                            "h-7 shrink-0 rounded-sm px-1.5 text-[11px]",
+                            "h-6 shrink-0 rounded-sm px-1 text-[11px]",
                             line.priceReason === "瑕疵"
                               ? "bg-red-600 text-white"
                               : "border text-muted-foreground",
@@ -722,12 +722,12 @@ export function CheckoutView() {
                         setLineNote(line.id, event.target.value)
                       }
                       placeholder="備註"
-                      className="h-7 min-w-16 flex-1 rounded-sm border bg-card px-1.5 text-[11px] outline-none focus-visible:border-ring"
+                      className="h-6 w-16 shrink-0 rounded-sm border bg-card px-1 text-[11px] outline-none focus-visible:border-ring"
                       aria-label={`${line.product.name} 備註`}
                     />
                     <button
                       type="button"
-                      className="flex size-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-destructive"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-destructive"
                       onClick={() => setQty(line.id, 0)}
                       aria-label={`移除 ${line.product.name}`}
                     >
@@ -1177,7 +1177,7 @@ export function CheckoutView() {
         </div>
       </section>
 
-      <aside className="border-t bg-muted/70 lg:w-[30rem] lg:shrink-0 lg:border-t-0 lg:border-l lg:shadow-[-8px_0_24px_rgba(0,0,0,0.04)] xl:w-[32rem]">
+      <aside className="border-t bg-muted/70 lg:w-[32rem] lg:shrink-0 lg:border-t-0 lg:border-l lg:shadow-[-8px_0_24px_rgba(0,0,0,0.04)] xl:w-[34rem]">
         <div className="lg:sticky lg:top-9 lg:h-[calc(100svh-2.25rem)]">
           {cartPanel}
         </div>
