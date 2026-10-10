@@ -205,6 +205,10 @@ export function StockReportView() {
     () => chunkSoldProducts(soldRows, 2),
     [soldRows],
   );
+  const purchasePrintCols = useMemo(
+    () => chunkSoldProducts(purchaseLines, 2),
+    [purchaseLines],
+  );
   const dayRefund = returnDetailTotals(dayReturns).amount;
   const dayRevenue = daySaleTotals.amount - dayRefund;
   const monthRevenue = saleDetailTotals(monthSales);
@@ -1440,7 +1444,47 @@ export function StockReportView() {
         </div>
       </section>
 
-      <div className="rp-purchases overflow-x-auto">
+      {purchaseLines.length > 0 ? (
+        <div className="rp-purchases rp-buy-grid hidden print:grid px-3 pb-2 print:px-0">
+          <p className="rp-buy-title">進貨 · {periodLabel}</p>
+          {purchasePrintCols.map((col, colIndex) => (
+            <table key={colIndex} className="rp-print-table w-full">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold">品項</th>
+                  <th className="num font-semibold">數量</th>
+                  <th className="num font-semibold">售價</th>
+                  <th className="num font-semibold">批價</th>
+                </tr>
+              </thead>
+              <tbody>
+                {col.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-muted-foreground">
+                      —
+                    </td>
+                  </tr>
+                ) : (
+                  col.map((line, index) => (
+                    <tr key={`${line.purchaseId}-${line.productId}-${index}`}>
+                      <td>{line.name}</td>
+                      <td className="num tabular-nums">{line.qty}</td>
+                      <td className="num tabular-nums">{Math.round(line.unitPrice)}</td>
+                      <td className="num tabular-nums">{Math.round(line.unitCost)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ))}
+          <p className="rp-day-sold-total">
+            總合計 · {purchaseLines.length}項 · {buyTotals.qty}件 · 售價{" "}
+            {Math.round(buyTotals.retailAmount)} · 批價 {Math.round(buyTotals.amount)}
+          </p>
+        </div>
+      ) : null}
+
+      <div className="rp-purchases overflow-x-auto print:hidden">
         {purchaseLines.length === 0 ? (
           <p
             className={cn(
