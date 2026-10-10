@@ -912,10 +912,10 @@ export function StockReportView() {
         ) : (
           <table className="rp-print-table mt-1 w-full text-[11px] print:text-[10px]">
             <colgroup>
-              <col style={{ width: "28%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "48%" }} />
-              <col style={{ width: "12%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "14%" }} />
+              <col style={{ width: "44%" }} />
+              <col style={{ width: "16%" }} />
             </colgroup>
             <thead>
               <tr className="border-b">
@@ -1136,10 +1136,10 @@ export function StockReportView() {
           <table className="rp-print-table w-full text-[11px] print:text-[10px]">
             <colgroup>
               <col style={{ width: "14%" }} />
-              <col style={{ width: "28%" }} />
-              <col style={{ width: "10%" }} />
+              <col style={{ width: "24%" }} />
+              <col style={{ width: "12%" }} />
               <col style={{ width: "14%" }} />
-              <col style={{ width: "14%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "20%" }} />
             </colgroup>
             <thead>

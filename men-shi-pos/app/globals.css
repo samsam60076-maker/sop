@@ -164,7 +164,7 @@
   html[data-print-preview] [data-slot="table-head"],
   html[data-print-preview] [data-slot="table-cell"] {
     height: auto;
-    padding: 2px 4px;
+    padding: 3px 8px;
     border-bottom: 1px solid #ccc;
     vertical-align: middle;
     overflow: hidden;
@@ -367,7 +367,7 @@
     [data-slot="table-head"],
     [data-slot="table-cell"] {
       height: auto;
-      padding: 2px 4px;
+      padding: 3px 8px;
       border-bottom: 1px solid #ccc;
       vertical-align: middle;
       overflow: hidden;
