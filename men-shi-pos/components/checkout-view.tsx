@@ -857,16 +857,15 @@ export function CheckoutView() {
         ) : null}
         {refundOpen ? (
           <form
-            className="mb-3 space-y-2 rounded-xl border bg-background p-3"
+            className="mb-2 space-y-1 rounded-md border bg-background p-2"
             onSubmit={(event) => {
               event.preventDefault();
               confirmRefund();
             }}
           >
-            <p className="text-sm font-medium">退費</p>
-            <div className="space-y-1">
-              <label htmlFor="refund-amount" className="text-sm">
-                退費金額
+            <div className="flex items-center gap-2">
+              <label htmlFor="refund-amount" className="shrink-0 text-xs font-medium">
+                退費
               </label>
               <input
                 id="refund-amount"
@@ -876,50 +875,45 @@ export function CheckoutView() {
                 inputMode="numeric"
                 value={refundAmount}
                 onChange={(event) => setRefundAmount(event.target.value)}
-                placeholder="自己打，例如 50"
+                placeholder="金額，例如 50"
                 autoFocus
-                className="h-12 w-full rounded-lg border border-input bg-card px-3 text-2xl font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="h-8 min-w-0 flex-1 rounded-md border border-input bg-card px-2 text-sm font-semibold tabular-nums outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
               />
             </div>
-            <div className="space-y-1">
-              <label htmlFor="refund-note" className="text-sm">
-                備註
-              </label>
-              <div className="mb-1 flex flex-wrap gap-1">
-                {["商品不佳", "多收", "客人要求", "退費"].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={cn(
-                      "rounded-full border px-2 py-0.5 text-xs",
-                      refundNote === item
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background text-muted-foreground",
-                    )}
-                    onClick={() => setRefundNote(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                id="refund-note"
-                value={refundNote}
-                onChange={(event) => setRefundNote(event.target.value)}
-                placeholder="自己寫原因，例如 茶葉蛋不好吃退 50 元"
-                className="min-h-16 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              />
+            <div className="flex flex-wrap gap-1">
+              {["商品不佳", "多收", "客人要求", "退費"].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={cn(
+                    "rounded border px-1.5 py-px text-[11px] leading-5",
+                    refundNote === item
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "bg-background text-muted-foreground",
+                  )}
+                  onClick={() => setRefundNote(item)}
+                >
+                  {item}
+                </button>
+              ))}
             </div>
-            <div className="flex gap-2">
+            <input
+              id="refund-note"
+              value={refundNote}
+              onChange={(event) => setRefundNote(event.target.value)}
+              placeholder="原因，例如 茶葉蛋不好吃退 50 元"
+              className="h-8 w-full rounded-md border border-input bg-card px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+            />
+            <div className="flex gap-1.5">
               <button
                 type="submit"
-                className="h-11 flex-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
+                className="h-8 flex-1 rounded-md bg-primary px-2 text-sm font-medium text-primary-foreground"
               >
                 確認退費
               </button>
               <button
                 type="button"
-                className="h-11 rounded-lg border px-3 text-sm"
+                className="h-8 rounded-md border px-2 text-xs"
                 onClick={() => setRefundOpen(false)}
               >
                 取消
