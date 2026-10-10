@@ -986,11 +986,6 @@ export function ProductsView() {
                     </button>
                   </div>
                 ))}
-                {form.tiers.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    庫存仍按件扣。賣 1 件扣 1，賣 2 件扣 2，只是收銀收 100 而不是 120。
-                  </p>
-                ) : null}
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
