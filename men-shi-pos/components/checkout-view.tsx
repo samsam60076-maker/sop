@@ -982,32 +982,13 @@ export function CheckoutView() {
               <button
                 type="button"
                 className="rounded-md border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                onClick={() => {
-                  setDateOpen((open) => {
-                    if (open) setArrange(false);
-                    return !open;
-                  });
-                }}
+                onClick={() => setDateOpen((open) => !open)}
               >
                 {dateOpen ? "隱藏" : "打開"}
               </button>
-              <button
-                type="button"
-                className={cn(
-                  "rounded-md border px-1.5 py-0.5 text-[11px]",
-                  arrange
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "text-muted-foreground",
-                )}
-                onClick={() => {
-                  setArrange((current) => !current);
-                  if (!dateOpen) setDateOpen(true);
-                }}
-              >
-                {arrange ? "完成位置" : "調整位置"}
-              </button>
             </div>
             {dateOpen ? (
+              <>
               <YmdPicker
                 tiny
                 value={saleDate}
@@ -1015,7 +996,6 @@ export function CheckoutView() {
                 markedDates={saleDays}
                 markedHint="有收銀"
               />
-            ) : null}
             <div className="flex rounded-md border p-0.5">
               <button
                 type="button"
@@ -1054,6 +1034,8 @@ export function CheckoutView() {
                 團媽價
               </button>
             </div>
+              </>
+            ) : null}
           </div>
           <div className="mb-1.5 flex flex-wrap gap-1">
             {["全部", ...categories].map((item) => (
