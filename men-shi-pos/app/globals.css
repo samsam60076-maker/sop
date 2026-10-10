@@ -125,7 +125,71 @@
     font-size: 20px;
     @apply font-sans;
   }
+  html[data-print-preview] {
+    background: #525252;
+  }
+  html[data-print-preview] body {
+    background: #525252;
+    padding-top: 56px;
+  }
+  html[data-print-preview] header,
+  html[data-print-preview] .print\:hidden {
+    display: none !important;
+  }
+  html[data-print-preview] .print-preview-bar {
+    display: flex !important;
+  }
+  html[data-print-preview] .print-preview-sheet {
+    background: #fff;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  }
+  html[data-print-preview] .hidden.print\:block {
+    display: block !important;
+  }
+  html[data-print-preview] .hidden.print\:table-cell {
+    display: table-cell !important;
+  }
+  html[data-print-preview] [data-slot="table-container"],
+  html[data-print-preview] .overflow-x-auto {
+    overflow: visible !important;
+  }
+  html[data-print-preview] .report-print-day-cash .rp-purchases,
+  html[data-print-preview] .report-print-day-cash .rp-expenses,
+  html[data-print-preview] .report-print-day-cash .rp-stock,
+  html[data-print-preview] .report-print-day-cash .rp-month-daily,
+  html[data-print-preview] .report-print-day-cash .rp-sale-tickets,
+  html[data-print-preview] .report-print-purchases .rp-day-sold,
+  html[data-print-preview] .report-print-month-daily .rp-day-sold,
+  html[data-print-preview] .report-print-all .rp-day-sold,
+  html[data-print-preview] .report-print-purchases .rp-sales,
+  html[data-print-preview] .report-print-purchases .rp-returns,
+  html[data-print-preview] .report-print-purchases .rp-expenses,
+  html[data-print-preview] .report-print-purchases .rp-stock,
+  html[data-print-preview] .report-print-purchases .rp-month-daily,
+  html[data-print-preview] .report-print-purchases .rp-summary,
+  html[data-print-preview] .report-print-month-daily .rp-sales,
+  html[data-print-preview] .report-print-month-daily .rp-returns,
+  html[data-print-preview] .report-print-month-daily .rp-purchases,
+  html[data-print-preview] .report-print-month-daily .rp-expenses,
+  html[data-print-preview] .report-print-month-daily .rp-stock,
+  html[data-print-preview] .report-print-all .rp-month-daily,
+  html[data-print-preview] .rp-summary {
+    display: none !important;
+  }
   @media print {
+    html[data-print-preview],
+    html[data-print-preview] body {
+      background: #fff;
+      padding-top: 0;
+    }
+    .print-preview-sheet {
+      zoom: 1 !important;
+      width: auto !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      background: #fff !important;
+    }
     header {
       display: none !important;
     }

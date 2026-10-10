@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -88,7 +88,8 @@ export function StockReportView() {
   );
   const [pickedReturns, setPickedReturns] = useState<Set<string>>(new Set());
   const [pickedExpenses, setPickedExpenses] = useState<Set<string>>(new Set());
-  const pendingPrint = useRef(false);
+  const [printPreview, setPrintPreview] = useState(false);
+  const [printZoom, setPrintZoom] = useState(1.5);
   const [printPick, setPrintPick] = useState<PrintJob>("dayCash");
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
 
@@ -405,33 +406,78 @@ export function StockReportView() {
     const job = printPick;
     setQuery("");
     setPrintJob(job);
-    pendingPrint.current = true;
-    if (job === "dayCash" && period !== "day") {
-      setPeriod("day");
-      return;
-    }
-    if (job === "monthDaily" && period !== "month") {
-      setPeriod("month");
-    }
+    setPrintZoom(1.5);
+    setPrintPreview(true);
+    if (job === "dayCash" && period !== "day") setPeriod("day");
+    if (job === "monthDaily" && period !== "month") setPeriod("month");
+  }
+
+  function closePrintPreview() {
+    setPrintPreview(false);
+    setPrintJob(null);
   }
 
   useEffect(() => {
-    if (!pendingPrint.current || printJob == null) return;
-    if (printJob === "dayCash" && period !== "day") return;
-    if (printJob === "monthDaily" && period !== "month") return;
-    pendingPrint.current = false;
-    const done = () => {
-      window.removeEventListener("afterprint", done);
-      setPrintJob(null);
-    };
-    window.addEventListener("afterprint", done);
-    const timer = window.setTimeout(() => window.print(), 50);
+    if (!printPreview) {
+      document.documentElement.removeAttribute("data-print-preview");
+      return;
+    }
+    document.documentElement.setAttribute("data-print-preview", "1");
     return () => {
-      window.clearTimeout(timer);
+      document.documentElement.removeAttribute("data-print-preview");
     };
-  }, [period, query, details.length, purchaseLines.length, printJob]);
+  }, [printPreview]);
 
   return (
+    <>
+      {printPreview ? (
+        <div className="print-preview-bar print:hidden fixed inset-x-0 top-0 z-50 flex flex-wrap items-center gap-2 border-b bg-card px-3 py-2 text-foreground shadow">
+          <p className="text-sm font-semibold">列印預覽</p>
+          <p className="text-xs text-muted-foreground">可放大看字，確定後再開始列印</p>
+          <button
+            type="button"
+            className="h-8 rounded border bg-background px-2 text-sm"
+            onClick={() =>
+              setPrintZoom((current) => Math.max(0.75, Number((current - 0.25).toFixed(2))))
+            }
+          >
+            縮小
+          </button>
+          <span className="min-w-12 text-center text-sm tabular-nums">
+            {Math.round(printZoom * 100)}%
+          </span>
+          <button
+            type="button"
+            className="h-8 rounded border bg-background px-2 text-sm"
+            onClick={() =>
+              setPrintZoom((current) => Math.min(2.5, Number((current + 0.25).toFixed(2))))
+            }
+          >
+            放大
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded border bg-background px-2 text-sm"
+            onClick={() => setPrintZoom(1)}
+          >
+            100%
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded bg-primary px-3 text-sm font-medium text-primary-foreground"
+            onClick={() => window.print()}
+          >
+            開始列印
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded border bg-background px-2 text-sm"
+            onClick={closePrintPreview}
+          >
+            關閉
+          </button>
+        </div>
+      ) : null}
     <div
       className={cn(
         "flex flex-col print:p-0",
@@ -439,7 +485,9 @@ export function StockReportView() {
         printJob === "purchases" && "report-print-purchases",
         printJob === "monthDaily" && "report-print-month-daily",
         printJob === "all" && "report-print-all",
+        printPreview && "print-preview-sheet mx-auto bg-white p-4 shadow",
       )}
+      style={printPreview ? { zoom: printZoom, width: "210mm" } : undefined}
     >
       <div className="border-b bg-card px-3 py-2 md:px-4 print:border-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1529,6 +1577,7 @@ export function StockReportView() {
         )}
       </div>
     </div>
+    </>
   );
 }
 
