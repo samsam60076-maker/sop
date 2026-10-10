@@ -38,7 +38,7 @@ export function StoreBar() {
   return (
     <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 px-2 py-0.5">
       <span className="shrink-0 text-[10px] text-sidebar-foreground/70">
-        總部
+        珊珊海鮮肉舖
       </span>
       <button
         type="button"
