@@ -833,6 +833,7 @@ export function applySale(
     received: number;
     note: string;
     createdAt?: string;
+    origin?: Sale["origin"];
   },
 ): EngineResult<Sale> {
   if (input.items.length === 0) return { ok: false, error: "購物車是空的" };
@@ -965,6 +966,7 @@ export function applySale(
     total,
     note: input.note.trim(),
     status: "completed",
+    origin: input.origin === "writeoff" ? "writeoff" : "checkout",
   };
 
   const products = state.products.map((product) => {

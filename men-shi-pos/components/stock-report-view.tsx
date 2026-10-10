@@ -34,6 +34,8 @@ import {
   stockChangeNote,
   buildMonthDailyCash,
   monthDailyCashTotals,
+  checkoutSaleLines,
+  writeoffSaleLines,
   type ReportPeriod,
   type SaleDetailLine,
 } from "@/lib/report";
@@ -114,7 +116,11 @@ export function StockReportView() {
     [state, period, day],
   );
   const daySales = useMemo(
-    () => buildSaleDetails(state, "day", day),
+    () => checkoutSaleLines(buildSaleDetails(state, "day", day)),
+    [state, day],
+  );
+  const dayWriteoffs = useMemo(
+    () => writeoffSaleLines(buildSaleDetails(state, "day", day)),
     [state, day],
   );
   const dayReturns = useMemo(
@@ -122,7 +128,7 @@ export function StockReportView() {
     [state, day],
   );
   const monthSales = useMemo(
-    () => buildSaleDetails(state, "month", day),
+    () => checkoutSaleLines(buildSaleDetails(state, "month", day)),
     [state, day],
   );
   const monthReturns = useMemo(
@@ -189,6 +195,7 @@ export function StockReportView() {
   const spendTotal = expenseTotals(expenseLines);
   const refundTotal = returnDetailTotals(returnLines);
   const daySaleTotals = saleDetailTotals(daySales);
+  const dayWriteoffTotals = saleDetailTotals(dayWriteoffs);
   const soldRows = useMemo(() => summarizeSoldProducts(daySales), [daySales]);
   const soldCols = useMemo(() => chunkSoldProducts(soldRows, 3), [soldRows]);
   const dayRefund = returnDetailTotals(dayReturns).amount;
@@ -213,7 +220,9 @@ export function StockReportView() {
   const hqRows = useMemo(
     () =>
       allStores.map((store) => {
-        const sales = saleDetailTotals(buildSaleDetails(store.state, "month", day));
+        const sales = saleDetailTotals(
+          checkoutSaleLines(buildSaleDetails(store.state, "month", day)),
+        );
         const refunds = returnDetailTotals(
           buildReturnDetails(store.state, "month", day),
         );
@@ -506,6 +515,9 @@ export function StockReportView() {
                     今天總共販售 {soldRows.length} 項 · {daySaleTotals.qty} 件 · 金額{" "}
                     {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
                     {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
+                    {dayWriteoffs.length
+                      ? ` · 銷貨 ${dayWriteoffs.length}項 ${dayWriteoffTotals.qty}件`
+                      : ""}
                   </p>
                 </>
               ) : printJob === "purchases" ? (
@@ -875,6 +887,56 @@ export function StockReportView() {
           {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
           {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
         </p>
+      </section>
+      ) : null}
+
+      {period === "day" || printJob === "dayCash" ? (
+      <section className="rp-writeoffs border-b px-3 py-2 md:px-4 print:px-0 print:py-1">
+        <h2 className="text-sm font-semibold print:text-[12px]">
+          銷貨 · 壞掉扣庫存 · {month}/{date}
+        </h2>
+        {dayWriteoffs.length === 0 ? (
+          <p className="py-2 text-center text-[13px] text-muted-foreground print:py-1 print:text-[11px]">
+            這個日期還沒有銷貨。
+          </p>
+        ) : (
+          <table className="mt-1 w-full text-[11px] print:text-[10px]">
+            <thead>
+              <tr className="border-b">
+                <th className="py-0.5 text-left font-semibold">品項</th>
+                <th className="num py-0.5 text-right font-semibold">數量</th>
+                <th className="py-0.5 pl-2 text-left font-semibold">原因</th>
+                <th className="num py-0.5 text-right font-semibold">批發</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dayWriteoffs.map((line, index) => (
+                <tr key={`${line.saleId}-${line.productId}-${index}`} className="border-b border-dashed">
+                  <td className="py-px pr-1">{line.name}</td>
+                  <td className="num py-px tabular-nums">{line.qty}</td>
+                  <td className="py-px pl-2">
+                    {line.saleNote.trim() || line.note.trim() || "—"}
+                  </td>
+                  <td className="num py-px tabular-nums">
+                    {Math.round(line.costAmount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="py-0.5 font-semibold">合計</td>
+                <td className="num py-0.5 font-semibold tabular-nums">
+                  {dayWriteoffTotals.qty}
+                </td>
+                <td />
+                <td className="num py-0.5 font-semibold tabular-nums">
+                  {Math.round(dayWriteoffTotals.costAmount)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
       </section>
       ) : null}
 

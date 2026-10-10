@@ -116,6 +116,8 @@ export type SaleItem = {
   note?: string;
 };
 
+export type SaleOrigin = "checkout" | "writeoff";
+
 export type Sale = {
   id: string;
   number: string;
@@ -127,6 +129,7 @@ export type Sale = {
   total: number;
   note: string;
   status: "completed" | "voided";
+  origin?: SaleOrigin;
 };
 
 export type MovementType = "in" | "out" | "adjust";

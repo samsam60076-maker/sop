@@ -1,5 +1,5 @@
 import { lineAmount } from "@/lib/pricing";
-import type { AppState, Product } from "@/lib/types";
+import type { AppState, Product, Sale, SaleOrigin } from "@/lib/types";
 
 export type ReportPeriod = "day" | "month" | "all";
 
@@ -24,6 +24,7 @@ export type SaleDetailLine = {
   createdAt: string;
   note: string;
   saleNote: string;
+  origin: SaleOrigin;
   productId: string;
   name: string;
   qty: number;
@@ -88,6 +89,32 @@ function inPeriod(iso: string, from: Date | null, to: Date | null) {
   if (from && time < from) return false;
   if (to && time >= to) return false;
   return true;
+}
+
+const CHECKOUT_NOTE =
+  /員工價|團媽價|特價|瑕疵|臉書訂購|現場加買|正常販售/;
+const WRITEOFF_NOTE = /損壞|報廢|壞掉|過期|試吃|調帳|耗損|丟掉|破損|不能賣/;
+
+export function saleOriginOf(
+  sale: Pick<Sale, "note" | "origin" | "items">,
+): SaleOrigin {
+  if (sale.origin === "writeoff" || sale.origin === "checkout") return sale.origin;
+  const note = sale.note.trim();
+  if (!note || note === "正常販售") return "checkout";
+  if (WRITEOFF_NOTE.test(note)) return "writeoff";
+  if (CHECKOUT_NOTE.test(note)) return "checkout";
+  const lineNotes = sale.items
+    .map((item) => item.note?.trim() ?? "")
+    .filter(Boolean);
+  return lineNotes.length === 0 && note ? "writeoff" : "checkout";
+}
+
+export function checkoutSaleLines(lines: SaleDetailLine[]) {
+  return lines.filter((line) => line.origin !== "writeoff");
+}
+
+export function writeoffSaleLines(lines: SaleDetailLine[]) {
+  return lines.filter((line) => line.origin === "writeoff");
 }
 
 export function stockChangeNote(row: StockReportRow) {
@@ -251,6 +278,7 @@ export function buildSaleDetails(
         createdAt: sale.createdAt,
         note: item.note != null ? item.note : sale.note,
         saleNote: sale.note,
+        origin: saleOriginOf(sale),
         productId: item.productId,
         name: item.name,
         qty: item.qty,
@@ -544,7 +572,7 @@ export function buildMonthDailyCash(
   const rows: MonthDayCashRow[] = [];
   for (let date = 1; date <= lastDay; date += 1) {
     const key = `${year}-${monthPadded}-${String(date).padStart(2, "0")}`;
-    const sales = buildSaleDetails(state, "day", key);
+    const sales = checkoutSaleLines(buildSaleDetails(state, "day", key));
     const refunds = buildReturnDetails(state, "day", key);
     const expenses = buildExpenseDetails(state, "day", key);
     const saleTotals = saleDetailTotals(sales);

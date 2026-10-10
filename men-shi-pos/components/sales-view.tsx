@@ -136,6 +136,7 @@ export function SalesView() {
       received: draftTotal,
       note: reason,
       createdAt: inputDateToIso(saleDate),
+      origin: "writeoff",
     });
     if (!result.ok) {
       toast.error(result.error);
