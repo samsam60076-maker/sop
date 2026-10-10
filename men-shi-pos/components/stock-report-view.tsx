@@ -429,6 +429,18 @@ export function StockReportView() {
     setPrintJob(null);
   }
 
+  function startSystemPrint() {
+    document.documentElement.removeAttribute("data-print-preview");
+    const restore = () => {
+      window.removeEventListener("afterprint", restore);
+      if (printPreview) {
+        document.documentElement.setAttribute("data-print-preview", "1");
+      }
+    };
+    window.addEventListener("afterprint", restore);
+    window.print();
+  }
+
   useEffect(() => {
     if (!printPreview) {
       document.documentElement.removeAttribute("data-print-preview");
@@ -477,7 +489,7 @@ export function StockReportView() {
           <button
             type="button"
             className="h-8 rounded bg-primary px-3 text-sm font-medium text-primary-foreground"
-            onClick={() => window.print()}
+            onClick={startSystemPrint}
           >
             開始列印
           </button>
@@ -811,7 +823,49 @@ export function StockReportView() {
             這天還沒有販售
           </p>
         ) : (
-          <div className="rp-day-sold-grid mt-1 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <>
+          <div className="rp-day-sold-grid mt-1 hidden print:block">
+            <table className="rp-print-table w-full">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold">品項</th>
+                  <th className="num font-semibold">賣價</th>
+                  <th className="num font-semibold">數量</th>
+                  <th className="num font-semibold">金額</th>
+                  <th className="num font-semibold">批發</th>
+                </tr>
+              </thead>
+              <tbody>
+                {soldRows.map((row) => (
+                  <tr key={row.productId || row.name}>
+                    <td>{row.name}</td>
+                    <td className="num tabular-nums">
+                      {row.unitPrice == null
+                        ? Math.round(row.amount / Math.max(row.qty, 1))
+                        : Math.round(row.unitPrice)}
+                    </td>
+                    <td className="num tabular-nums">{row.qty}</td>
+                    <td className="num tabular-nums">{Math.round(row.amount)}</td>
+                    <td className="num tabular-nums">{Math.round(row.costAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-semibold">合計</td>
+                  <td />
+                  <td className="num font-semibold tabular-nums">{daySaleTotals.qty}</td>
+                  <td className="num font-semibold tabular-nums">
+                    {Math.round(daySaleTotals.amount)}
+                  </td>
+                  <td className="num font-semibold tabular-nums">
+                    {Math.round(daySaleTotals.costAmount)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="mt-1 grid grid-cols-1 gap-2 md:grid-cols-3 print:hidden">
             {soldCols.map((col, colIndex) => {
               const colQty = col.reduce((sum, row) => sum + row.qty, 0);
               const colAmount = col.reduce((sum, row) => sum + row.amount, 0);
@@ -819,15 +873,8 @@ export function StockReportView() {
               return (
                 <table
                   key={colIndex}
-                  className="rp-print-table w-full text-[11px] print:text-[10px]"
+                  className="w-full text-[11px]"
                 >
-                  <colgroup>
-                    <col style={{ width: "32%" }} />
-                    <col style={{ width: "17%" }} />
-                    <col style={{ width: "17%" }} />
-                    <col style={{ width: "17%" }} />
-                    <col style={{ width: "17%" }} />
-                  </colgroup>
                   <thead>
                     <tr className="border-b">
                       <th className="py-0.5 text-left font-semibold">品項</th>
@@ -883,8 +930,9 @@ export function StockReportView() {
               );
             })}
           </div>
+          </>
         )}
-        <p className="mt-1 text-[12px] font-semibold tabular-nums print:text-[11px]">
+        <p className="mt-1 text-[12px] font-semibold tabular-nums print:hidden">
           總紀錄 · {soldRows.length}項 · {daySaleTotals.qty}件 · 金額{" "}
           {twd(daySaleTotals.amount)} · 批發 {twd(daySaleTotals.costAmount)}
           {dayRefund ? ` · 退款 ${twd(dayRefund)}` : ""}
@@ -902,19 +950,13 @@ export function StockReportView() {
             這個日期還沒有銷貨。
           </p>
         ) : (
-          <table className="rp-print-table mt-1 w-full text-[11px] print:text-[10px]">
-            <colgroup>
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "44%" }} />
-              <col style={{ width: "16%" }} />
-            </colgroup>
+          <table className="rp-print-table mt-1 w-full">
             <thead>
               <tr className="border-b">
-                <th className="py-0.5 text-left font-semibold">品項</th>
-                <th className="num py-0.5 text-right font-semibold">數量</th>
-                <th className="py-0.5 pl-2 text-left font-semibold">原因</th>
-                <th className="num py-0.5 text-right font-semibold">批發</th>
+                <th className="text-left font-semibold">品項</th>
+                <th className="num font-semibold">數量</th>
+                <th className="text-left font-semibold">原因</th>
+                <th className="num font-semibold">批發</th>
               </tr>
             </thead>
             <tbody>
@@ -1125,15 +1167,7 @@ export function StockReportView() {
 
       {returnLines.length > 0 ? (
         <div className="rp-returns hidden print:block px-3 pb-2 md:px-4 print:px-0">
-          <table className="rp-print-table w-full text-[11px] print:text-[10px]">
-            <colgroup>
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "24%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "20%" }} />
-            </colgroup>
+          <table className="rp-print-table w-full">
             <thead>
               <tr>
                 <th className="text-left font-semibold">時間</th>

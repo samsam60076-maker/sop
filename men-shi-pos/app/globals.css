@@ -144,39 +144,30 @@
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   }
   html[data-print-preview] .rp-day-sold-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-    gap: 8px;
+    display: block;
   }
-  html[data-print-preview] .rp-print-table,
   html[data-print-preview] .rp-day-sold-grid table,
-  html[data-print-preview] [data-slot="table"] {
+  html[data-print-preview] .rp-print-table {
     width: 100%;
-    table-layout: fixed;
+    table-layout: auto;
     border-collapse: collapse;
-    font-size: 10px;
-    line-height: 1.3;
+    font-size: 12px;
+    line-height: 1.35;
   }
   html[data-print-preview] .rp-print-table th,
   html[data-print-preview] .rp-print-table td,
   html[data-print-preview] .rp-day-sold-grid th,
-  html[data-print-preview] .rp-day-sold-grid td,
-  html[data-print-preview] [data-slot="table-head"],
-  html[data-print-preview] [data-slot="table-cell"] {
+  html[data-print-preview] .rp-day-sold-grid td {
     height: auto;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-bottom: 1px solid #ccc;
     vertical-align: middle;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   html[data-print-preview] .rp-print-table .num,
-  html[data-print-preview] .rp-day-sold-grid .num,
-  html[data-print-preview] [data-slot="table-cell"].text-right,
-  html[data-print-preview] [data-slot="table-head"].text-right {
+  html[data-print-preview] .rp-day-sold-grid .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
-    white-space: nowrap;
   }
   html[data-print-preview] .hidden.print\:block {
     display: block !important;
@@ -227,6 +218,10 @@
       padding: 0 !important;
       box-shadow: none !important;
       background: #fff !important;
+    }
+    .print-preview-bar,
+    html[data-print-preview] .print-preview-bar {
+      display: none !important;
     }
     header {
       display: none !important;
@@ -344,42 +339,33 @@
       font-weight: 700;
     }
     .rp-day-sold-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-      gap: 3mm;
-      font-size: 10px;
-      line-height: 1.25;
+      display: block;
+      font-size: 12px;
+      line-height: 1.35;
       color: #111;
     }
     .rp-print-table,
-    .rp-day-sold-grid table,
-    [data-slot="table"] {
+    .rp-day-sold-grid table {
       width: 100%;
-      table-layout: fixed;
+      table-layout: auto;
       border-collapse: collapse;
-      font-size: 10px;
-      line-height: 1.3;
+      font-size: 12px;
+      line-height: 1.35;
     }
     .rp-print-table th,
     .rp-print-table td,
     .rp-day-sold-grid th,
-    .rp-day-sold-grid td,
-    [data-slot="table-head"],
-    [data-slot="table-cell"] {
+    .rp-day-sold-grid td {
       height: auto;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-bottom: 1px solid #ccc;
       vertical-align: middle;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .rp-print-table .num,
-    .rp-day-sold-grid .num,
-    [data-slot="table-cell"].text-right,
-    [data-slot="table-head"].text-right {
+    .rp-day-sold-grid .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
-      white-space: nowrap;
     }
     .rp-day-sold-grid tfoot td,
     .rp-print-table tfoot td {
