@@ -36,6 +36,7 @@ import {
   monthDailyCashTotals,
   checkoutSaleLines,
   writeoffSaleLines,
+  type MonthDayCashRow,
   type ReportPeriod,
   type SaleDetailLine,
 } from "@/lib/report";
@@ -740,11 +741,11 @@ export function StockReportView() {
         ) : null}
       </div>
 
-      <section className="rp-month-daily border-t px-3 py-2 md:px-4">
-        <h2 className="text-sm font-semibold">
+      <section className="rp-month-daily border-t px-3 py-1.5 md:px-4">
+        <h2 className="text-xs font-semibold">
           {year}年{month}月每日收銀
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground print:hidden">
+        <p className="mt-0.5 text-[10px] text-muted-foreground print:hidden">
           含員工價、團媽價。列印只印當日售出、批發與支出。
         </p>
       </section>
@@ -786,89 +787,21 @@ export function StockReportView() {
         </div>
       ) : null}
 
-      <div className="rp-month-daily overflow-x-auto print:hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>日</TableHead>
-              <TableHead className="text-right">收銀售出</TableHead>
-              <TableHead className="text-right">收銀批發</TableHead>
-              <TableHead className="text-right print:hidden">
-                其中員工／團媽
-              </TableHead>
-              <TableHead className="text-right print:hidden">退款</TableHead>
-              <TableHead className="text-right print:hidden">淨收銀</TableHead>
-              <TableHead className="text-right">支出</TableHead>
-              <TableHead className="text-right print:hidden">當日結餘</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {monthDailyRows.map((row) => {
-              const idle =
-                row.saleAmount === 0 &&
-                row.refundAmount === 0 &&
-                row.expenseAmount === 0;
-              return (
-                <TableRow
-                  key={row.date}
-                  className={cn(
-                    row.date === day && "bg-primary/5",
-                    idle && printJob !== "monthDaily" && "print:hidden",
-                  )}
-                >
-                  <TableCell className="tabular-nums">{row.day}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.saleAmount ? twd(row.saleAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.costAmount ? twd(row.costAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums print:hidden">
-                    {row.staffAmount ? twd(row.staffAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums print:hidden">
-                    {row.refundAmount ? twd(row.refundAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                    {row.netAmount ? twd(row.netAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.expenseAmount ? twd(row.expenseAmount) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                    {idle ? "—" : twd(row.balance)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell className="font-semibold">合計</TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
-                {twd(monthDailyTotals.saleAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
-                {twd(monthDailyTotals.costAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                {twd(monthDailyTotals.staffAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                {twd(monthDailyTotals.refundAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                {twd(monthDailyTotals.netAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums">
-                {twd(monthDailyTotals.expenseAmount)}
-              </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums print:hidden">
-                {twd(monthDailyTotals.balance)}
-              </TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+      <div className="rp-month-daily overflow-x-auto px-3 pb-2 print:hidden md:px-4">
+        <div className="grid min-w-[640px] grid-cols-2 gap-x-3">
+          {monthDailyPrintCols.map((col, colIndex) => (
+            <MonthDailyScreenCol key={colIndex} rows={col} day={day} />
+          ))}
+        </div>
+        <p className="mt-1 border-t pt-1 text-[10px] font-semibold tabular-nums">
+          總合計 · 售出 {twd(monthDailyTotals.saleAmount)} · 批發{" "}
+          {twd(monthDailyTotals.costAmount)} · 員團{" "}
+          {twd(monthDailyTotals.staffAmount)} · 退{" "}
+          {twd(monthDailyTotals.refundAmount)} · 淨{" "}
+          {twd(monthDailyTotals.netAmount)} · 支{" "}
+          {twd(monthDailyTotals.expenseAmount)} · 餘{" "}
+          {twd(monthDailyTotals.balance)}
+        </p>
       </div>
 
       {period === "day" ? (
@@ -1919,6 +1852,68 @@ export function StockReportView() {
       </div>
     </div>
     </>
+  );
+}
+
+function MonthDailyScreenCol({
+  rows,
+  day,
+}: {
+  rows: MonthDayCashRow[];
+  day: string;
+}) {
+  return (
+    <table className="w-full text-[10px] leading-tight">
+      <thead>
+        <tr className="border-b">
+          <th className="py-0.5 text-left font-semibold">日</th>
+          <th className="py-0.5 text-right font-semibold">售出</th>
+          <th className="py-0.5 text-right font-semibold">批發</th>
+          <th className="py-0.5 text-right font-semibold">員團</th>
+          <th className="py-0.5 text-right font-semibold">退款</th>
+          <th className="py-0.5 text-right font-semibold">淨收</th>
+          <th className="py-0.5 text-right font-semibold">支出</th>
+          <th className="py-0.5 text-right font-semibold">結餘</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const idle =
+            row.saleAmount === 0 &&
+            row.refundAmount === 0 &&
+            row.expenseAmount === 0;
+          return (
+            <tr
+              key={row.date}
+              className={cn(row.date === day && "bg-primary/5")}
+            >
+              <td className="py-px tabular-nums">{row.day}</td>
+              <td className="py-px text-right tabular-nums">
+                {row.saleAmount ? twd(row.saleAmount) : "—"}
+              </td>
+              <td className="py-px text-right tabular-nums">
+                {row.costAmount ? twd(row.costAmount) : "—"}
+              </td>
+              <td className="py-px text-right tabular-nums">
+                {row.staffAmount ? twd(row.staffAmount) : "—"}
+              </td>
+              <td className="py-px text-right tabular-nums">
+                {row.refundAmount ? twd(row.refundAmount) : "—"}
+              </td>
+              <td className="py-px text-right font-semibold tabular-nums">
+                {row.netAmount ? twd(row.netAmount) : "—"}
+              </td>
+              <td className="py-px text-right tabular-nums">
+                {row.expenseAmount ? twd(row.expenseAmount) : "—"}
+              </td>
+              <td className="py-px text-right font-semibold tabular-nums">
+                {idle ? "—" : twd(row.balance)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
