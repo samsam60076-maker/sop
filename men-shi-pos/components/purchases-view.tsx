@@ -26,7 +26,8 @@ type DraftLine = {
 };
 
 export function PurchasesView() {
-  const { state, storeName, receiveStock, removePurchase } = useStore();
+  const { state, storeName, receiveStock, removePurchaseItem, removePurchases } =
+    useStore();
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(toInputDate());
   const [query, setQuery] = useState("");
@@ -98,6 +99,7 @@ export function PurchasesView() {
         purchase.items.map((item, index) => ({
           key: `${purchase.id}-${item.productId}-${index}`,
           purchaseId: purchase.id,
+          itemIndex: index,
           createdAt: purchase.createdAt,
           number: purchase.number,
           note: purchase.note,
@@ -127,7 +129,9 @@ export function PurchasesView() {
       hint: line.number,
       qty: line.qty,
       amount: line.amount,
-      onDelete: () => deleteOnePurchase(line.purchaseId, line.number),
+      deleteLabel: "單一刪除",
+      onDelete: () =>
+        deleteOneItem(line.purchaseId, line.itemIndex, line.name),
     }));
     return [...pending, ...posted];
   }, [lines, dayLines]);
@@ -357,20 +361,38 @@ export function PurchasesView() {
     resetForm();
   }
 
-  function deleteOnePurchase(purchaseId: string, number: string) {
-    if (
-      !window.confirm(
-        `確定刪除進貨 ${number}？進貨與總表會一起拿掉，庫存扣回，可再重打。`,
-      )
-    ) {
+  function deleteOneItem(
+    purchaseId: string,
+    itemIndex: number,
+    name: string,
+  ) {
+    if (!window.confirm(`確定單一刪除「${name}」？只拿掉這一項，其他進貨還在。`)) {
       return;
     }
-    const result = removePurchase(purchaseId);
+    const result = removePurchaseItem(purchaseId, itemIndex);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    toast.success(`已刪除 ${number}`);
+    toast.success(`已單一刪除 ${name}`);
+  }
+
+  function deleteAllDayPurchases() {
+    const ids = dayPurchases.map((purchase) => purchase.id);
+    if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `確定全部刪除今天進貨？共 ${dayLines.length} 項會一起拿掉，庫存扣回。`,
+      )
+    ) {
+      return;
+    }
+    const result = removePurchases(ids);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`已全部刪除今天進貨 ${dayLines.length} 項`);
   }
 
   const cartPanel = (
@@ -633,6 +655,7 @@ export function PurchasesView() {
           day={purchaseDate}
           lines={paperLines}
           defaultOpen={false}
+          onDeleteAll={deleteAllDayPurchases}
         />
       </div>
     </div>

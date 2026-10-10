@@ -732,6 +732,54 @@ export function removePurchases(state: AppState, purchaseIds: string[]) {
   return applyEach(state, purchaseIds, "請先勾選要刪的進貨", removePurchase);
 }
 
+export function removePurchaseItem(
+  state: AppState,
+  purchaseId: string,
+  itemIndex: number,
+): EngineResult<Purchase> {
+  const purchase = state.purchases.find((item) => item.id === purchaseId);
+  if (!purchase) return { ok: false, error: "找不到進貨單" };
+  const item = purchase.items[itemIndex];
+  if (!item) return { ok: false, error: "找不到這項進貨" };
+  if (purchase.items.length <= 1) {
+    return removePurchase(state, purchaseId);
+  }
+  const subtracted = subtractStock(state.products, qtyByProduct([item]));
+  if (!subtracted.ok) return subtracted;
+  const items = purchase.items.filter((_, index) => index !== itemIndex);
+  const next: Purchase = {
+    ...purchase,
+    items,
+    totalCost: items.reduce((sum, row) => sum + row.qty * row.unitCost, 0),
+  };
+  let removedMovement = false;
+  const movements = state.movements.filter((row) => {
+    if (removedMovement) return true;
+    if (
+      row.refId === purchaseId &&
+      row.productId === item.productId &&
+      row.type === "in" &&
+      row.qty === item.qty
+    ) {
+      removedMovement = true;
+      return false;
+    }
+    return true;
+  });
+  return {
+    ok: true,
+    data: next,
+    state: {
+      ...state,
+      products: subtracted.products,
+      purchases: state.purchases.map((row) =>
+        row.id === purchaseId ? next : row,
+      ),
+      movements,
+    },
+  };
+}
+
 export function applySale(
   state: AppState,
   input: {

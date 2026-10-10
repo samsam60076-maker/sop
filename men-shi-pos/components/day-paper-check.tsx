@@ -14,6 +14,7 @@ export type DayPaperLine = {
   refund?: boolean;
   onOpen?: () => void;
   onDelete?: () => void;
+  deleteLabel?: string;
 };
 
 function escapeHtml(value: string) {
@@ -112,12 +113,14 @@ export function DayPaperCheck({
   day,
   lines,
   defaultOpen = false,
+  onDeleteAll,
 }: {
   kind: string;
   shopName: string;
   day: string;
   lines: DayPaperLine[];
   defaultOpen?: boolean;
+  onDeleteAll?: () => void;
 }) {
   const storageKey = `corner-pos-day-paper-${kind}`;
   const [open, setOpen] = useState(defaultOpen);
@@ -199,6 +202,15 @@ export function DayPaperCheck({
         >
           預覽核對
         </button>
+        {onDeleteAll && shown.some((line) => line.onDelete) ? (
+          <button
+            type="button"
+            className="h-6 rounded border border-destructive/40 bg-background px-2 text-[11px] text-destructive"
+            onClick={onDeleteAll}
+          >
+            全部刪除
+          </button>
+        ) : null}
       </div>
       {open ? (
         <>
@@ -283,9 +295,12 @@ export function DayPaperCheck({
                       <button
                         type="button"
                         className="shrink-0 px-1 text-[10px] text-destructive underline"
-                        onClick={line.onDelete}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          line.onDelete?.();
+                        }}
                       >
-                        刪除
+                        {line.deleteLabel ?? "刪除"}
                       </button>
                     ) : null}
                   </li>

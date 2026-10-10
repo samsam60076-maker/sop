@@ -39,6 +39,7 @@ import {
   removeProduct,
   removeProducts,
   removePurchase,
+  removePurchaseItem,
   removePurchases,
   removeReturn,
   removeReturns,
@@ -131,6 +132,10 @@ type StoreContextValue = {
   removeSale: (saleId: string) => ReturnType<typeof removeSale>;
   removeSales: (saleIds: string[]) => ReturnType<typeof removeSales>;
   removePurchase: (purchaseId: string) => ReturnType<typeof removePurchase>;
+  removePurchaseItem: (
+    purchaseId: string,
+    itemIndex: number,
+  ) => ReturnType<typeof removePurchaseItem>;
   removePurchases: (
     purchaseIds: string[],
   ) => ReturnType<typeof removePurchases>;
@@ -918,6 +923,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       removePurchase: (purchaseId) => {
         const result = removePurchase(read(), purchaseId);
+        if (result.ok) commit(result.state);
+        return result;
+      },
+      removePurchaseItem: (purchaseId, itemIndex) => {
+        const result = removePurchaseItem(read(), purchaseId, itemIndex);
         if (result.ok) commit(result.state);
         return result;
       },
