@@ -168,6 +168,8 @@
   html[data-print-preview] .rp-day-sold-grid .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
+    min-width: 4.5em;
+    padding-right: 16px;
   }
   html[data-print-preview] .hidden.print\:block {
     display: block !important;
@@ -366,6 +368,8 @@
     .rp-day-sold-grid .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
+      min-width: 4.5em;
+      padding-right: 16px;
     }
     .rp-day-sold-grid tfoot td,
     .rp-print-table tfoot td {
