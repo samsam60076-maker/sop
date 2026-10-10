@@ -144,7 +144,8 @@
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   }
   html[data-print-preview] .rp-day-sold-grid,
-  html[data-print-preview] .hidden.print\:grid {
+  html[data-print-preview] .hidden.print\:grid,
+  html[data-print-preview] .rp-pair {
     display: grid !important;
     grid-template-columns: 1fr 1fr;
     column-gap: 12px;
@@ -201,6 +202,9 @@
   html[data-print-preview] .report-print-purchases .rp-writeoffs,
   html[data-print-preview] .report-print-month-daily .rp-writeoffs,
   html[data-print-preview] .report-print-all .rp-writeoffs,
+  html[data-print-preview] .report-print-purchases .rp-pair,
+  html[data-print-preview] .report-print-month-daily .rp-pair,
+  html[data-print-preview] .report-print-all .rp-pair,
   html[data-print-preview] .report-print-purchases .rp-day-sold,
   html[data-print-preview] .report-print-month-daily .rp-day-sold,
   html[data-print-preview] .report-print-all .rp-day-sold,
@@ -256,6 +260,9 @@
     .report-print-purchases .rp-writeoffs,
     .report-print-month-daily .rp-writeoffs,
     .report-print-all .rp-writeoffs,
+    .report-print-purchases .rp-pair,
+    .report-print-month-daily .rp-pair,
+    .report-print-all .rp-pair,
     .report-print-purchases .rp-day-sold,
     .report-print-month-daily .rp-day-sold,
     .report-print-all .rp-day-sold,
@@ -352,7 +359,8 @@
       color: #b45309;
       font-weight: 700;
     }
-    .rp-day-sold-grid {
+    .rp-day-sold-grid,
+    .rp-pair {
       display: grid !important;
       grid-template-columns: 1fr 1fr;
       column-gap: 4mm;

@@ -947,8 +947,91 @@ export function StockReportView() {
       ) : null}
 
       {period === "day" || printJob === "dayCash" ? (
-      <section className="rp-writeoffs border-b px-3 py-2 md:px-4 print:px-0 print:py-1">
-        <h2 className="text-sm font-semibold print:text-[12px]">
+      <section className="rp-pair hidden print:grid px-3 py-2 print:px-0 print:py-1">
+        <div>
+          <h2 className="text-[12px] font-semibold">
+            銷貨 · 壞掉扣庫存 · {month}/{date}
+          </h2>
+          {dayWriteoffs.length === 0 ? (
+            <p className="py-2 text-[11px] text-muted-foreground">這個日期還沒有銷貨。</p>
+          ) : (
+            <table className="rp-print-table mt-1 w-full">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold">品項</th>
+                  <th className="num font-semibold">數量</th>
+                  <th className="text-left font-semibold">原因</th>
+                  <th className="num font-semibold">批發</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dayWriteoffs.map((line, index) => (
+                  <tr key={`${line.saleId}-${line.productId}-${index}`}>
+                    <td>{line.name}</td>
+                    <td className="num tabular-nums">{line.qty}</td>
+                    <td>{line.saleNote.trim() || line.note.trim() || "—"}</td>
+                    <td className="num tabular-nums">{Math.round(line.costAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-semibold">合計</td>
+                  <td className="num font-semibold tabular-nums">{dayWriteoffTotals.qty}</td>
+                  <td />
+                  <td className="num font-semibold tabular-nums">
+                    {Math.round(dayWriteoffTotals.costAmount)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+        <div>
+          <h2 className="text-[12px] font-semibold">
+            退貨 · {year}年{month}月{date}日
+          </h2>
+          {returnLines.length === 0 ? (
+            <p className="py-2 text-[11px] text-muted-foreground">這個日期還沒有退貨。</p>
+          ) : (
+            <table className="rp-print-table mt-1 w-full">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold">品項</th>
+                  <th className="num font-semibold">數量</th>
+                  <th className="num font-semibold">金額</th>
+                  <th className="text-left font-semibold">備註</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnLines.map((line, index) => (
+                  <tr key={`${line.returnId}-pair-${index}`}>
+                    <td>{line.name}</td>
+                    <td className="num tabular-nums">{line.qty}</td>
+                    <td className="num tabular-nums">{Math.round(line.amount)}</td>
+                    <td>{line.note || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="font-semibold">合計</td>
+                  <td className="num font-semibold tabular-nums">{refundTotal.qty}</td>
+                  <td className="num font-semibold tabular-nums">
+                    {Math.round(refundTotal.amount)}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      </section>
+      ) : null}
+
+      {period === "day" || printJob === "dayCash" ? (
+      <section className="rp-writeoffs border-b px-3 py-2 md:px-4 print:hidden">
+        <h2 className="text-sm font-semibold">
           銷貨 · 壞掉扣庫存 · {month}/{date}
         </h2>
         {dayWriteoffs.length === 0 ? (
@@ -1160,7 +1243,7 @@ export function StockReportView() {
           returnLines.length === 0 && printJob !== "dayCash" && "print:hidden",
         )}
       >
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <h2 className="text-sm font-semibold">退貨 · {periodLabel}</h2>
           <PickBar
             count={pickedReturns.size}
@@ -1172,7 +1255,7 @@ export function StockReportView() {
       </section>
 
       {returnLines.length > 0 ? (
-        <div className="rp-returns hidden print:block px-3 pb-2 md:px-4 print:px-0">
+        <div className="rp-returns hidden px-3 pb-2 md:px-4">
           <table className="rp-print-table w-full">
             <thead>
               <tr>
@@ -1215,8 +1298,7 @@ export function StockReportView() {
       {returnLines.length === 0 ? (
         <p
           className={cn(
-            "rp-returns px-6 py-8 text-center text-sm text-muted-foreground print:py-2 print:text-[11px]",
-            printJob !== "dayCash" && "print:hidden",
+            "rp-returns px-6 py-8 text-center text-sm text-muted-foreground print:hidden",
           )}
         >
           這個日期還沒有退貨。
