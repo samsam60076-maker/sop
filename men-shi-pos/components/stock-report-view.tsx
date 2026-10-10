@@ -91,7 +91,7 @@ export function StockReportView() {
   const [pickedReturns, setPickedReturns] = useState<Set<string>>(new Set());
   const [pickedExpenses, setPickedExpenses] = useState<Set<string>>(new Set());
   const [printPreview, setPrintPreview] = useState(false);
-  const [printZoom, setPrintZoom] = useState(1.5);
+  const [printZoom, setPrintZoom] = useState(1);
   const [printPick, setPrintPick] = useState<PrintJob>("dayCash");
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
 
@@ -415,7 +415,7 @@ export function StockReportView() {
     const job = printPick;
     setQuery("");
     setPrintJob(job);
-    setPrintZoom(1.5);
+    setPrintZoom(1);
     setPrintPreview(true);
     if (job === "dayCash" && period !== "day") setPeriod("day");
     if (job === "monthDaily" && period !== "month") setPeriod("month");
