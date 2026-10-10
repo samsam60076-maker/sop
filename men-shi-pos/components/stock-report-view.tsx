@@ -94,6 +94,7 @@ export function StockReportView() {
   const [printZoom, setPrintZoom] = useState(1);
   const [printPick, setPrintPick] = useState<PrintJob>("dayCash");
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const allRows = useMemo(
     () => buildStockReport(state, period, day),
@@ -648,84 +649,95 @@ export function StockReportView() {
             className="h-8 w-36 rounded-md border border-input bg-card px-2 text-sm outline-none focus-visible:border-ring md:w-44"
             aria-label="搜尋"
           />
+          <button
+            type="button"
+            className="h-8 rounded-md border bg-background px-2 text-xs print:hidden"
+            onClick={() => setSummaryOpen((current) => !current)}
+          >
+            {summaryOpen ? "隱藏" : "打開"}本月格子
+          </button>
         </div>
 
-        <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7 print:hidden rp-hq">
-          {hqRows.map((row) => (
-            <button
-              key={row.id}
-              type="button"
-              onClick={() => switchStore(row.id)}
-              className={cn(
-                "rounded-md border px-1.5 py-1 text-left",
-                storeId === row.id
-                  ? "border-primary bg-primary/5"
-                  : "bg-background hover:bg-muted/40",
-              )}
-            >
-              <p className="text-[10px] leading-none text-muted-foreground">
-                {row.name}本月
-              </p>
-              <p className="font-heading truncate text-sm font-semibold tabular-nums leading-tight">
-                {twd(row.revenue)}
-              </p>
-            </button>
-          ))}
-        </div>
+        {summaryOpen ? (
+          <>
+            <div className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-7 print:hidden rp-hq">
+              {hqRows.map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => switchStore(row.id)}
+                  className={cn(
+                    "rounded-md border px-1.5 py-1 text-left",
+                    storeId === row.id
+                      ? "border-primary bg-primary/5"
+                      : "bg-background hover:bg-muted/40",
+                  )}
+                >
+                  <p className="text-[10px] leading-none text-muted-foreground">
+                    {row.name}本月
+                  </p>
+                  <p className="font-heading truncate text-sm font-semibold tabular-nums leading-tight">
+                    {twd(row.revenue)}
+                  </p>
+                </button>
+              ))}
+            </div>
 
-        <div className="rp-summary print:hidden">
-        <div className="mt-0.5 grid grid-cols-4 gap-0.5">
-          <Summary
-            label={`${month}/${date}銷售`}
-            value={`${daySaleTotals.qty}件`}
-            hint={
-              dayRefund
-                ? `${twd(dayRevenue)} · 退${twd(dayRefund)}`
-                : twd(dayRevenue)
-            }
-          />
-          <Summary
-            label={`${month}月營收`}
-            value={twd(monthNetRevenue)}
-            hint={
-              monthRefund.amount
-                ? `${monthRevenue.qty}件 · 退${twd(monthRefund.amount)}`
-                : `${monthRevenue.qty}件`
-            }
-          />
-          <Summary
-            label={`${month}月支出`}
-            value={twd(monthSpend)}
-            hint={`${monthExpenses.length}筆`}
-          />
-          <Summary
-            label={`${month}月結餘`}
-            value={twd(monthNet)}
-          />
-        </div>
-        <div className="mt-0.5 grid grid-cols-4 gap-0.5">
-          <Summary
-            label={`${month}月進貨售價`}
-            value={twd(monthBuy.retailAmount)}
-            hint={`${monthBuy.qty}件`}
-          />
-          <Summary
-            label={`${month}月進貨批價`}
-            value={twd(monthBuy.amount)}
-            hint={`${monthBuy.qty}件`}
-          />
-          <Summary
-            label={`${month}月毛利`}
-            value={twd(monthGross)}
-            hint={`銷貨批價 ${twd(monthCogs)}`}
-          />
-          <Summary
-            label={`${month}月毛利率`}
-            value={marginLabel(monthRate)}
-            hint={twd(monthGross)}
-          />
-        </div>
-        </div>
+            <div className="rp-summary print:hidden">
+              <div className="mt-0.5 grid grid-cols-4 gap-0.5">
+                <Summary
+                  label={`${month}/${date}銷售`}
+                  value={`${daySaleTotals.qty}件`}
+                  hint={
+                    dayRefund
+                      ? `${twd(dayRevenue)} · 退${twd(dayRefund)}`
+                      : twd(dayRevenue)
+                  }
+                />
+                <Summary
+                  label={`${month}月營收`}
+                  value={twd(monthNetRevenue)}
+                  hint={
+                    monthRefund.amount
+                      ? `${monthRevenue.qty}件 · 退${twd(monthRefund.amount)}`
+                      : `${monthRevenue.qty}件`
+                  }
+                />
+                <Summary
+                  label={`${month}月支出`}
+                  value={twd(monthSpend)}
+                  hint={`${monthExpenses.length}筆`}
+                />
+                <Summary
+                  label={`${month}月結餘`}
+                  value={twd(monthNet)}
+                />
+              </div>
+              <div className="mt-0.5 grid grid-cols-4 gap-0.5">
+                <Summary
+                  label={`${month}月進貨售價`}
+                  value={twd(monthBuy.retailAmount)}
+                  hint={`${monthBuy.qty}件`}
+                />
+                <Summary
+                  label={`${month}月進貨批價`}
+                  value={twd(monthBuy.amount)}
+                  hint={`${monthBuy.qty}件`}
+                />
+                <Summary
+                  label={`${month}月毛利`}
+                  value={twd(monthGross)}
+                  hint={`銷貨批價 ${twd(monthCogs)}`}
+                />
+                <Summary
+                  label={`${month}月毛利率`}
+                  value={marginLabel(monthRate)}
+                  hint={twd(monthGross)}
+                />
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <section className="rp-month-daily border-t px-3 py-2 md:px-4">
