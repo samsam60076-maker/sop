@@ -19,7 +19,9 @@ export function StoreBar() {
   const { storeId, branches, switchStore, addStore, removeStore } = useStore();
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const current = branches.find((branch) => branch.id === storeId);
 
   function submitAdd() {
     const result = addStore(name);
@@ -38,6 +40,19 @@ export function StoreBar() {
       <span className="shrink-0 text-[11px] text-sidebar-foreground/70">
         總部
       </span>
+      <button
+        type="button"
+        className="inline-flex h-6 items-center rounded border border-sidebar-border px-1.5 text-[11px] text-sidebar-foreground/80 hover:bg-sidebar-accent"
+        onClick={() => {
+          setOpen((currentOpen) => {
+            if (currentOpen) setEditing(false);
+            return !currentOpen;
+          });
+        }}
+      >
+        {open ? "隱藏" : "打開"}
+      </button>
+      {open ? (
       <div className="flex min-w-0 flex-wrap items-center gap-0.5">
         {branches.map((branch) => (
           <span key={branch.id} className="inline-flex items-center">
@@ -106,6 +121,11 @@ export function StoreBar() {
           {editing ? "完成" : "增減"}
         </button>
       </div>
+      ) : (
+        <span className="inline-flex h-6 items-center rounded bg-sidebar-primary px-1.5 text-xs text-sidebar-primary-foreground">
+          {current?.name ?? ""}
+        </span>
+      )}
 
       <Dialog open={adding} onOpenChange={setAdding}>
         <DialogContent className="max-w-sm">
